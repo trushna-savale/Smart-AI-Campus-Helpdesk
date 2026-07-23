@@ -26,7 +26,7 @@ admissions, departments, facilities, and general help in a polite and helpful ma
 """
 
 model = genai.GenerativeModel(
-    model_name="gemini-1.5-flash",
+    model_name="gemini-2.0-flash",
     system_instruction=SYSTEM_INSTRUCTION
 )
 
