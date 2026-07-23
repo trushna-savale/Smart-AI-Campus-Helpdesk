@@ -132,6 +132,7 @@
 
       <div class="messages-box" id="chatBox"></div>
 
+      <!-- HERE IS THE PAPERCLIP CODE -->
       <div class="input-area">
         <label class="attach-btn" title="Attach Image">
           <i class="fa-solid fa-paperclip"></i>
@@ -221,7 +222,6 @@
     document.getElementById('dispPRN').innerText = currentStudent.prn;
   }
 
-  // Client-Side Canvas Image Compression (Prevents Server Overload)
   function handleImageUpload(e) {
     const file = e.target.files[0];
     if (!file) return;
@@ -239,7 +239,6 @@
         const ctx = canvas.getContext('2d');
         ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
         
-        // Compressed base64 string
         attachedImageData = canvas.toDataURL('image/jpeg', 0.6);
         const preview = document.getElementById('imgPreview');
         preview.src = attachedImageData;
