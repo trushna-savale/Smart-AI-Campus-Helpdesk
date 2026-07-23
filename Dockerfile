@@ -1,9 +1,12 @@
-FROM langflowai/langflow:latest
-ENV LANGFLOW_HOST=0.0.0.0
-ENV LANGFLOW_PORT=10000
-ENV PORT=10000
-ENV LANGFLOW_NUM_WORKERS=1
-ENV DO_NOT_TRACK=true
-ENV LANGFLOW_AUTO_LOGIN=true
-EXPOSE 10000
-CMD ["langflow", "run", "--backend-only"]
+FROM python:3.11-slim
+
+WORKDIR /app
+
+COPY requirements.txt .
+RUN pip install --no-cache-dir -r requirements.txt
+
+COPY app.py .
+
+EXPOSE 7860
+
+CMD ["uvicorn", "app:app", "--host", "0.0.0.0", "--port", "7860"]
