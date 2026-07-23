@@ -224,7 +224,6 @@
     document.getElementById('dispPRN').innerText = currentStudent.prn;
   }
 
-  /* Feature 2: Convert Attached Image to Base64 */
   function handleImageUpload(e) {
     const file = e.target.files[0];
     if (!file) return;
@@ -245,11 +244,11 @@
     div.className = `message ${sender === 'user' ? 'user-message' : 'bot-message'}`;
     div.innerText = text;
 
-    /* Feature 1: Simulated Email Confirmation Box when a Ticket is Generated */
-    if (ticketId) {
+    // Only show Email Confirmation Banner IF an official Ticket ID was created (Complaints only, not FAQs)
+    if (ticketId && ticketId !== "None" && ticketId.includes("CMP-")) {
       const emailBox = document.createElement("div");
       emailBox.className = "email-banner";
-      emailBox.innerHTML = `<i class="fa-solid fa-envelope-circle-check"></i> <div><b>Email Confirmation Sent!</b><br>A confirmation email with ticket details was dispatched to student record (${currentStudent.prn}).</div>`;
+      emailBox.innerHTML = `<i class="fa-solid fa-envelope-circle-check"></i> <div><b>Email Confirmation Sent!</b><br>Confirmation dispatched to student record (${currentStudent.prn}).</div>`;
       div.appendChild(emailBox);
     }
 
@@ -257,6 +256,7 @@
     chatBox.scrollTop = chatBox.scrollHeight;
   }
 
+  // FIXED: Automatically sends message when chip is clicked
   function sendChip(text) {
     document.getElementById("userInput").value = text;
     sendMessage();
@@ -340,6 +340,5 @@
 
   function handleKeyPress(e) { if (e.key === "Enter") sendMessage(); }
 </script>
-
 </body>
 </html>
