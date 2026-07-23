@@ -22,8 +22,11 @@ app.add_middleware(
 DB_FILE = "helpdesk.db"
 
 def init_db():
+    """Initializes the database and ensures all required columns exist."""
     conn = sqlite3.connect(DB_FILE)
     cursor = conn.cursor()
+    
+    # Create table with complete schema from scratch
     cursor.execute("""
         CREATE TABLE IF NOT EXISTS chat_logs (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -41,22 +44,28 @@ def init_db():
     """)
     conn.commit()
 
-    # AUTO-FIX SCHEMA: Add missing columns if database was created with old schema
+    # Dynamic Column Addition Safety Check
     cursor.execute("PRAGMA table_info(chat_logs)")
-    columns = [column[1] for column in cursor.fetchall()]
-    
-    if "student_name" not in columns:
-        cursor.execute("ALTER TABLE chat_logs ADD COLUMN student_name TEXT DEFAULT 'Anonymous'")
-    if "prn" not in columns:
-        cursor.execute("ALTER TABLE chat_logs ADD COLUMN prn TEXT DEFAULT 'N/A'")
-    if "section" not in columns:
-        cursor.execute("ALTER TABLE chat_logs ADD COLUMN section TEXT DEFAULT 'N/A'")
-    if "image_data" not in columns:
-        cursor.execute("ALTER TABLE chat_logs ADD COLUMN image_data TEXT DEFAULT NULL")
-        
+    existing_cols = [col[1] for col in cursor.fetchall()]
+
+    required_cols = {
+        "student_name": "TEXT DEFAULT 'Anonymous'",
+        "prn": "TEXT DEFAULT 'N/A'",
+        "section": "TEXT DEFAULT 'N/A'",
+        "image_data": "TEXT DEFAULT NULL"
+    }
+
+    for col_name, col_def in required_cols.items():
+        if col_name not in existing_cols:
+            try:
+                cursor.execute(f"ALTER TABLE chat_logs ADD COLUMN {col_name} {col_def}")
+            except Exception as e:
+                print(f"Column migration notice for {col_name}: {e}")
+
     conn.commit()
     conn.close()
 
+# Run init on startup
 init_db()
 
 def extract_ticket_info(bot_response: str):
@@ -108,7 +117,7 @@ RULES:
 2. COMPLAINTS & ISSUE REPORTS (Broken fan, Wi-Fi down, damaged projector, lost item):
    - Generate an official support ticket in this exact format:
 
-You are an AI Smart Campus Helpdesk Assistant.
+   You are an AI Smart Campus Helpdesk Assistant.
 Your job is to help students register campus complaints professionally.
 
 REQUIRED INFORMATION TO REGISTER:
@@ -209,9 +218,9 @@ def chat(request: QueryRequest):
             
         client = Groq(api_key=api_key)
         
-        prompt_content = f"Student Info: Name={request.student_name}, PRN={request.prn}, Section={request.section}. Issue: {request.message}"
+        prompt_content = f"Student Info: Name={request.student_name}, PRN={request.prn}, Section={request.section}. Question/Issue: {request.message}"
         if request.image_data:
-            prompt_content += " [Note: Student attached a photo of the issue]."
+            prompt_content += " [Image Attached by student]."
 
         chat_completion = client.chat.completions.create(
             messages=[
