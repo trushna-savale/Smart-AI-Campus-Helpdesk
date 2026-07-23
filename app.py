@@ -36,22 +36,10 @@ def init_db():
             user_message TEXT NOT NULL,
             bot_response TEXT NOT NULL,
             status TEXT DEFAULT 'Open',
-            category TEXT DEFAULT 'General',
-            image_data TEXT DEFAULT NULL
+            category TEXT DEFAULT 'General'
         )
     """)
     conn.commit()
-
-    # Column Migration Check
-    cursor.execute("PRAGMA table_info(chat_logs)")
-    existing_cols = [col[1] for col in cursor.fetchall()]
-    if "image_data" not in existing_cols:
-        try:
-            cursor.execute("ALTER TABLE chat_logs ADD COLUMN image_data TEXT DEFAULT NULL")
-            conn.commit()
-        except Exception as e:
-            print(f"Migration note: {e}")
-            
     conn.close()
 
 init_db()
@@ -71,16 +59,16 @@ def extract_ticket_info(bot_response: str):
         
     return ticket_id, category
 
-def log_to_db(student_name: str, prn: str, section: str, user_message: str, bot_response: str, image_data: str = None):
+def log_to_db(student_name: str, prn: str, section: str, user_message: str, bot_response: str):
     try:
         ticket_id, category = extract_ticket_info(bot_response)
         conn = sqlite3.connect(DB_FILE)
         cursor = conn.cursor()
         cursor.execute(
             """INSERT INTO chat_logs 
-               (ticket_id, timestamp, student_name, prn, section, user_message, bot_response, status, category, image_data) 
-               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
-            (ticket_id, datetime.utcnow().strftime("%Y-%m-%d %H:%M:%S"), student_name, prn, section, user_message, bot_response, 'Open', category, image_data)
+               (ticket_id, timestamp, student_name, prn, section, user_message, bot_response, status, category) 
+               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+            (ticket_id, datetime.utcnow().strftime("%Y-%m-%d %H:%M:%S"), student_name, prn, section, user_message, bot_response, 'Open', category)
         )
         conn.commit()
         conn.close()
@@ -91,8 +79,10 @@ def log_to_db(student_name: str, prn: str, section: str, user_message: str, bot_
         return ticket_match.group(0) if ticket_match else f"CMP-{random.randint(100000, 999999)}"
 
 SYSTEM_INSTRUCTION = """
-You are an AI Smart Campus Helpdesk Assistant.
-Your job is to help students register campus complaints professionally.
+You are the official Smart AI Campus Helpdesk assistant.
+Your main duty is to generate a structured support report for every complaint reported by students.
+
+
 
 
 REQUIRED INFORMATION TO REGISTER:
@@ -193,6 +183,8 @@ Smart Campus Helpdesk Team
 --------------------------------------------------
 
 
+
+Then follow up with a short polite message confirming that the issue has been dispatched to campus technicians.
 """
 
 class QueryRequest(BaseModel):
@@ -200,7 +192,6 @@ class QueryRequest(BaseModel):
     student_name: str = "Anonymous"
     prn: str = "N/A"
     section: str = "N/A"
-    image_data: str = None
 
 class StatusUpdateRequest(BaseModel):
     ticket_id: str
@@ -220,8 +211,6 @@ def chat(request: QueryRequest):
         client = Groq(api_key=api_key)
         
         prompt_content = f"Student Name: {request.student_name}, PRN: {request.prn}, Section: {request.section}. Complaint: {request.message}"
-        if request.image_data:
-            prompt_content += " [Photo proof attached by student]."
 
         chat_completion = client.chat.completions.create(
             messages=[
@@ -232,12 +221,11 @@ def chat(request: QueryRequest):
         )
         
         bot_reply = chat_completion.choices[0].message.content
-        ticket_id = log_to_db(request.student_name, request.prn, request.section, request.message, bot_reply, request.image_data)
+        ticket_id = log_to_db(request.student_name, request.prn, request.section, request.message, bot_reply)
         
         return {"response": bot_reply, "ticket_id": ticket_id}
     except Exception as e:
         print(f"Chat Exception: {e}")
-        # Graceful fallback ticket format
         fallback_id = f"CMP-{random.randint(100000, 999999)}"
         fallback_text = f"SMART CAMPUS HELPDESK REPORT\nTicket ID: {fallback_id}\nCategory: General\nAssigned Department: Facilities Management\nStatus: Open\nEstimated Resolution Time: 2-4 hours\n\nYour complaint has been logged and dispatched to campus technicians."
         
