@@ -27,7 +27,7 @@ def init_db():
     cursor.execute("""
         CREATE TABLE IF NOT EXISTS chat_logs (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
-            ticket_id TEXT UNIQUE,
+            ticket_id TEXT,
             timestamp TEXT NOT NULL,
             student_name TEXT DEFAULT 'Anonymous',
             prn TEXT DEFAULT 'N/A',
@@ -35,7 +35,8 @@ def init_db():
             user_message TEXT NOT NULL,
             bot_response TEXT NOT NULL,
             status TEXT DEFAULT 'Open',
-            category TEXT DEFAULT 'General'
+            category TEXT DEFAULT 'General',
+            image_data TEXT DEFAULT NULL
         )
     """)
     conn.commit()
@@ -44,8 +45,12 @@ def init_db():
 init_db()
 
 def extract_ticket_info(bot_response: str):
+    """Parses ticket ID and category if present in AI output."""
     ticket_match = re.search(r'CMP-\d+', bot_response)
-    ticket_id = ticket_match.group(0) if ticket_match else f"CMP-{int(datetime.utcnow().timestamp()) % 1000000:06d}"
+    if not ticket_match:
+        return None, "FAQ/General"  # Feature 4: No ticket generated for simple queries
+        
+    ticket_id = ticket_match.group(0)
     
     category = "General"
     bot_lower = bot_response.lower()
@@ -53,21 +58,23 @@ def extract_ticket_info(bot_response: str):
         category = "Electrical"
     elif "it" in bot_lower or "wifi" in bot_lower or "internet" in bot_lower:
         category = "IT Support"
-    elif "maintenance" in bot_lower or "cleaning" in bot_lower:
+    elif "maintenance" in bot_lower or "cleaning" in bot_lower or "projector" in bot_lower:
         category = "Maintenance"
         
     return ticket_id, category
 
-def log_to_db(student_name: str, prn: str, section: str, user_message: str, bot_response: str):
+def log_to_db(student_name: str, prn: str, section: str, user_message: str, bot_response: str, image_data: str = None):
     try:
         ticket_id, category = extract_ticket_info(bot_response)
+        status = 'Open' if ticket_id else 'Resolved (FAQ)'
+        
         conn = sqlite3.connect(DB_FILE)
         cursor = conn.cursor()
         cursor.execute(
             """INSERT INTO chat_logs 
-               (ticket_id, timestamp, student_name, prn, section, user_message, bot_response, status, category) 
-               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)""",
-            (ticket_id, datetime.utcnow().strftime("%Y-%m-%d %H:%M:%S"), student_name, prn, section, user_message, bot_response, 'Open', category)
+               (ticket_id, timestamp, student_name, prn, section, user_message, bot_response, status, category, image_data) 
+               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+            (ticket_id, datetime.utcnow().strftime("%Y-%m-%d %H:%M:%S"), student_name, prn, section, user_message, bot_response, status, category, image_data)
         )
         conn.commit()
         conn.close()
@@ -76,8 +83,18 @@ def log_to_db(student_name: str, prn: str, section: str, user_message: str, bot_
         print(f"Database logging error: {e}")
         return None
 
+# FEATURE 4: FAQ / Ticket Deflection Prompt Rules
 SYSTEM_INSTRUCTION = """
-You are an AI Smart Campus Helpdesk Assistant.
+You are the Smart AI Campus Helpdesk assistant.
+
+RULES:
+1. FAQ / GENERAL INQUIRIES (Library hours, campus directions, syllabus, IT contact details):
+   - Answer the student's question directly and politely.
+   - DO NOT generate a ticket or Ticket ID for simple questions.
+
+2. COMPLAINTS & ISSUE REPORTS (Broken fan, Wi-Fi down, damaged projector, lost item):
+   - Generate an official support ticket in this exact format:
+
 Your job is to help students register campus complaints professionally.
 
 REQUIRED INFORMATION TO REGISTER:
@@ -152,8 +169,6 @@ Smart Campus Helpdesk Team
 
 --------------------------------------------------
 
-
-Be helpful, polite, and clear.
 """
 
 class QueryRequest(BaseModel):
@@ -161,6 +176,7 @@ class QueryRequest(BaseModel):
     student_name: str = "Anonymous"
     prn: str = "N/A"
     section: str = "N/A"
+    image_data: str = None
 
 class StatusUpdateRequest(BaseModel):
     ticket_id: str
@@ -179,22 +195,25 @@ def chat(request: QueryRequest):
             
         client = Groq(api_key=api_key)
         
+        prompt_content = f"Student Info: Name={request.student_name}, PRN={request.prn}, Section={request.section}. Issue: {request.message}"
+        if request.image_data:
+            prompt_content += " [Note: Student attached a photo of the issue]."
+
         chat_completion = client.chat.completions.create(
             messages=[
                 {"role": "system", "content": SYSTEM_INSTRUCTION},
-                {"role": "user", "content": f"Student Info: Name={request.student_name}, PRN={request.prn}, Section={request.section}. Issue: {request.message}"}
+                {"role": "user", "content": prompt_content}
             ],
             model="llama-3.3-70b-versatile",
         )
         
         bot_reply = chat_completion.choices[0].message.content
-        ticket_id = log_to_db(request.student_name, request.prn, request.section, request.message, bot_reply)
+        ticket_id = log_to_db(request.student_name, request.prn, request.section, request.message, bot_reply, request.image_data)
         
         return {"response": bot_reply, "ticket_id": ticket_id}
     except Exception as e:
         return {"error": str(e)}
 
-# LOOKUP TICKET BY TICKET ID OR PRN
 @app.get("/ticket/{query}")
 def get_ticket(query: str):
     conn = sqlite3.connect(DB_FILE)
@@ -248,7 +267,7 @@ def get_analytics():
     conn = sqlite3.connect(DB_FILE)
     cursor = conn.cursor()
     
-    cursor.execute("SELECT COUNT(*) FROM chat_logs")
+    cursor.execute("SELECT COUNT(*) FROM chat_logs WHERE ticket_id IS NOT NULL")
     total = cursor.fetchone()[0]
     
     cursor.execute("SELECT COUNT(*) FROM chat_logs WHERE status = 'Open'")
@@ -257,7 +276,7 @@ def get_analytics():
     cursor.execute("SELECT COUNT(*) FROM chat_logs WHERE status = 'Resolved'")
     resolved_tickets = cursor.fetchone()[0]
     
-    cursor.execute("SELECT category, COUNT(*) FROM chat_logs GROUP BY category ORDER BY COUNT(*) DESC LIMIT 1")
+    cursor.execute("SELECT category, COUNT(*) FROM chat_logs WHERE category != 'FAQ/General' GROUP BY category ORDER BY COUNT(*) DESC LIMIT 1")
     top_cat = cursor.fetchone()
     top_category = top_cat[0] if top_cat else "None"
     
