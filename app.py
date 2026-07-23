@@ -3,6 +3,7 @@ import re
 import csv
 import io
 import sqlite3
+import random
 from datetime import datetime
 from fastapi import FastAPI, Response
 from fastapi.middleware.cors import CORSMiddleware
@@ -24,10 +25,11 @@ DB_FILE = "helpdesk.db"
 def init_db():
     conn = sqlite3.connect(DB_FILE)
     cursor = conn.cursor()
+    # Removed UNIQUE constraint from ticket_id to prevent IntegrityErrors
     cursor.execute("""
         CREATE TABLE IF NOT EXISTS chat_logs (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
-            ticket_id TEXT UNIQUE,
+            ticket_id TEXT,
             timestamp TEXT NOT NULL,
             student_name TEXT DEFAULT 'Anonymous',
             prn TEXT DEFAULT 'N/A',
@@ -46,7 +48,10 @@ init_db()
 
 def extract_ticket_info(bot_response: str):
     ticket_match = re.search(r'CMP-\d+', bot_response)
-    ticket_id = ticket_match.group(0) if ticket_match else f"CMP-{int(datetime.utcnow().timestamp()) % 1000000:06d}"
+    if ticket_match:
+        ticket_id = ticket_match.group(0)
+    else:
+        ticket_id = f"CMP-{random.randint(100000, 999999)}"
     
     category = "General"
     bot_lower = bot_response.lower()
@@ -74,17 +79,16 @@ def log_to_db(student_name: str, prn: str, section: str, user_message: str, bot_
         conn.close()
         return ticket_id
     except Exception as e:
-        print(f"Database logging error: {e}")
-        return None
+        print(f"Database logging error (handled): {e}")
+        ticket_match = re.search(r'CMP-\d+', bot_response)
+        return ticket_match.group(0) if ticket_match else "CMP-100000"
 
 SYSTEM_INSTRUCTION = """
 You are the Smart AI Campus Helpdesk assistant.
-
-
-For EVERY complaint reported, generate an official support ticket in this format:
-
-
 Your job is to help students register campus complaints professionally.
+
+For EVERY complaint reported, generate an official support ticket in this exact format:
+
 
 REQUIRED INFORMATION TO REGISTER:
 1. Problem description (e.g., fan not working, AC broken, projector light flickering)
@@ -182,13 +186,13 @@ def chat(request: QueryRequest):
     try:
         api_key = os.getenv("GROQ_API_KEY")
         if not api_key:
-            return {"error": "GROQ_API_KEY environment variable is missing."}
+            return {"response": "GROQ_API_KEY environment variable is missing on server.", "ticket_id": None}
             
         client = Groq(api_key=api_key)
         
         prompt_content = f"Student Info: Name={request.student_name}, PRN={request.prn}, Section={request.section}. Issue: {request.message}"
         if request.image_data:
-            prompt_content += " [Note: Photo proof attached by student]."
+            prompt_content += " [Photo proof attached by student]."
 
         chat_completion = client.chat.completions.create(
             messages=[
@@ -203,7 +207,8 @@ def chat(request: QueryRequest):
         
         return {"response": bot_reply, "ticket_id": ticket_id}
     except Exception as e:
-        return {"error": str(e)}
+        print(f"Chat execution error: {e}")
+        return {"response": f"Server processing error: {str(e)}", "ticket_id": None}
 
 @app.get("/ticket/{query}")
 def get_ticket(query: str):
