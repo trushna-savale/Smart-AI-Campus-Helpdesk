@@ -9,11 +9,13 @@
     body { background-color: #eef2f5; display: flex; justify-content: center; align-items: center; height: 100vh; margin: 0; }
     
     .chat-container { width: 450px; height: 600px; background: #ffffff; border-radius: 12px; box-shadow: 0 8px 24px rgba(0,0,0,0.15); display: flex; flex-direction: column; overflow: hidden; }
-    .chat-header { background: #007bff; color: white; padding: 18px; text-align: center; font-size: 1.2rem; font-weight: bold; }
+    .chat-header { background: #007bff; color: white; padding: 18px; text-align: center; font-size: 1.2rem; font-weight: bold; position: relative; }
+    .clear-btn { position: absolute; right: 15px; top: 15px; background: #dc3545; color: white; border: none; padding: 6px 12px; border-radius: 12px; cursor: pointer; font-size: 0.8rem; }
+    .clear-btn:hover { background: #c82333; }
     
     .messages-box { flex: 1; padding: 20px; overflow-y: auto; display: flex; flex-direction: column; gap: 12px; }
     
-    .message { max-width: 80%; padding: 12px 16px; border-radius: 18px; line-height: 1.4; font-size: 0.95rem; }
+    .message { max-width: 80%; padding: 12px 16px; border-radius: 18px; line-height: 1.4; font-size: 0.95rem; white-space: pre-wrap; }
     .bot-message { background: #f1f3f5; color: #333; align-self: flex-start; border-bottom-left-radius: 4px; }
     .user-message { background: #007bff; color: white; align-self: flex-end; border-bottom-right-radius: 4px; }
     
@@ -26,10 +28,11 @@
 <body>
 
 <div class="chat-container">
-  <div class="chat-header">🏫 Smart Campus Helpdesk</div>
-  <div class="messages-box" id="chatBox">
-    <div class="message bot-message">Hello! Welcome to the Smart Campus Helpdesk. How can I assist you today?</div>
+  <div class="chat-header">
+    🏫 Smart Campus Helpdesk
+    <button class="clear-btn" onclick="clearChat()">Clear Chat</button>
   </div>
+  <div class="messages-box" id="chatBox"></div>
   <div class="input-area">
     <input type="text" id="userInput" placeholder="Ask about campus facilities, classes..." onkeypress="handleKeyPress(event)">
     <button onclick="sendMessage()">Send</button>
@@ -37,23 +40,52 @@
 </div>
 
 <script>
+  const DEFAULT_WELCOME = [{ sender: 'bot', text: 'Hello! Welcome to the Smart Campus Helpdesk. How can I assist you today?' }];
+
+  // 1. Load messages on startup
+  window.onload = function() {
+    loadChatHistory();
+  };
+
+  function loadChatHistory() {
+    const saved = localStorage.getItem('chatHistory');
+    const messages = saved ? JSON.parse(saved) : DEFAULT_WELCOME;
+    
+    const chatBox = document.getElementById("chatBox");
+    chatBox.innerHTML = "";
+    messages.forEach(msg => appendMessageUI(msg.sender, msg.text));
+  }
+
+  function saveMessageToStorage(sender, text) {
+    const saved = localStorage.getItem('chatHistory');
+    const messages = saved ? JSON.parse(saved) : [];
+    messages.push({ sender, text });
+    localStorage.setItem('chatHistory', JSON.stringify(messages));
+  }
+
+  function appendMessageUI(sender, text) {
+    const chatBox = document.getElementById("chatBox");
+    const div = document.createElement("div");
+    div.className = `message ${sender === 'user' ? 'user-message' : 'bot-message'}`;
+    div.innerText = text;
+    chatBox.appendChild(div);
+    chatBox.scrollTop = chatBox.scrollHeight;
+    return div;
+  }
+
   async function sendMessage() {
     const inputField = document.getElementById("userInput");
     const userText = inputField.value.trim();
     if (!userText) return;
 
-    const chatBox = document.getElementById("chatBox");
-
-    // Display user message
-    const userDiv = document.createElement("div");
-    userDiv.className = "message user-message";
-    userDiv.innerText = userText;
-    chatBox.appendChild(userDiv);
+    // Display & Save User Message
+    appendMessageUI('user', userText);
+    saveMessageToStorage('user', userText);
     
     inputField.value = "";
-    chatBox.scrollTop = chatBox.scrollHeight;
 
-    // Display loading message
+    // Show temporary typing indicator
+    const chatBox = document.getElementById("chatBox");
     const loadingDiv = document.createElement("div");
     loadingDiv.className = "message bot-message";
     loadingDiv.innerText = "Typing...";
@@ -61,7 +93,6 @@
     chatBox.scrollTop = chatBox.scrollHeight;
 
     try {
-      // Connect to your live Render API
       const response = await fetch("https://smart-ai-campus-helpdesk.onrender.com/chat", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -69,12 +100,24 @@
       });
 
       const data = await response.json();
-      loadingDiv.innerText = data.response || "Sorry, I couldn't process that.";
-    } catch (err) {
-      loadingDiv.innerText = "Error connecting to the server. Please try again later.";
-    }
+      const botReply = data.response || "Sorry, I couldn't process that.";
+      
+      // Remove loading indicator and save real response
+      chatBox.removeChild(loadingDiv);
+      appendMessageUI('bot', botReply);
+      saveMessageToStorage('bot', botReply);
 
-    chatBox.scrollTop = chatBox.scrollHeight;
+    } catch (err) {
+      chatBox.removeChild(loadingDiv);
+      const errorMsg = "Error connecting to the server. Please try again later.";
+      appendMessageUI('bot', errorMsg);
+      saveMessageToStorage('bot', errorMsg);
+    }
+  }
+
+  function clearChat() {
+    localStorage.removeItem('chatHistory');
+    loadChatHistory();
   }
 
   function handleKeyPress(event) {
