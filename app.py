@@ -1,3 +1,22 @@
+import os
+from fastapi import FastAPI
+from fastapi.middleware.cors import CORSMiddleware
+from pydantic import BaseModel
+from groq import Groq
+
+# Initialize the FastAPI app variable
+app = FastAPI(title="Smart AI Campus Helpdesk API")
+
+# Add CORS middleware for frontend access
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
+# Multi-line string properly enclosed with triple quotes
 SYSTEM_INSTRUCTION = """
 You are an AI Smart Campus Helpdesk Assistant.
 Your job is to help students register campus complaints professionally.
@@ -76,3 +95,30 @@ Smart Campus Helpdesk Team
 
 Always keep responses polite, concise, and structured.
 """
+
+class QueryRequest(BaseModel):
+    message: str
+
+@app.get("/")
+def home():
+    return {"status": "Smart AI Campus Helpdesk API is online"}
+
+@app.post("/chat")
+def chat(request: QueryRequest):
+    try:
+        api_key = os.getenv("GROQ_API_KEY")
+        if not api_key:
+            return {"error": "GROQ_API_KEY environment variable is missing."}
+            
+        client = Groq(api_key=api_key)
+        
+        chat_completion = client.chat.completions.create(
+            messages=[
+                {"role": "system", "content": SYSTEM_INSTRUCTION},
+                {"role": "user", "content": request.message}
+            ],
+            model="llama-3.3-70b-versatile",
+        )
+        return {"response": chat_completion.choices[0].message.content}
+    except Exception as e:
+        return {"error": str(e)}
