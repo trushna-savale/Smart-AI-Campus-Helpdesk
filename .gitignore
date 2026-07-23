@@ -1,0 +1,4 @@
+clean-langflow-env/
+.venv/
+.env
+*.db
