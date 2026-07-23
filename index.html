@@ -301,10 +301,18 @@
 
       const data = await response.json();
       chatBox.removeChild(loadingDiv);
-      appendMessageUI('bot', data.response || "Error processing request.", data.ticket_id);
+
+      // Check if the server returned an explicit error response
+      if (!response.ok || data.error) {
+        appendMessageUI('bot', `⚠️ API Error (${response.status}): ${data.error || data.response || 'Unknown server error'}`);
+      } else {
+        appendMessageUI('bot', data.response, data.ticket_id);
+      }
+
     } catch (err) {
+      // Print the REAL browser network error (e.g., Failed to fetch, CORS, Timeout)
       chatBox.removeChild(loadingDiv);
-      appendMessageUI('bot', "Error connecting to backend service.");
+      appendMessageUI('bot', `⚠️ Network/Client Error: ${err.message || err}`);
     }
   }
 
