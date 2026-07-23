@@ -44,16 +44,14 @@
     .bot-message { background: #f1f5f9; color: #1e2937; align-self: flex-start; border-bottom-left-radius: 2px; }
     .user-message { background: #4f46e5; color: white; align-self: flex-end; border-bottom-right-radius: 2px; }
 
-    /* Feature 1: Email Notification Banner */
     .email-banner { background: #ecfdf5; border: 1px solid #10b981; color: #065f46; border-radius: 8px; padding: 10px; font-size: 0.8rem; margin-top: 6px; display: flex; align-items: center; gap: 8px; }
 
     .input-area { display: flex; padding: 10px; border-top: 1px solid #e2e8f0; gap: 6px; align-items: center; }
     input[type="text"] { flex: 1; border: 1px solid #cbd5e1; border-radius: 20px; padding: 8px 14px; outline: none; font-size: 0.88rem; }
     
-    /* Feature 2: File Attachment Styling */
     .attach-btn { background: #f1f5f9; color: #475569; border: 1px solid #cbd5e1; border-radius: 50%; width: 36px; height: 36px; display: flex; align-items: center; justify-content: center; cursor: pointer; }
     .attach-btn:hover { background: #e2e8f0; }
-    .image-preview { width: 50px; height: 50px; border-radius: 6px; object-fit: cover; display: none; margin-right: 5px; }
+    .image-preview { width: 40px; height: 40px; border-radius: 6px; object-fit: cover; display: none; margin-right: 5px; }
 
     button.send-btn { background: #4f46e5; color: white; border: none; border-radius: 20px; padding: 0 16px; height: 36px; cursor: pointer; font-weight: 600; }
 
@@ -101,8 +99,8 @@
             <p>Upload photos of damaged equipment.</p>
           </div>
           <div class="feature-item">
-            <h4>🤖 FAQ Deflection</h4>
-            <p>Direct answers for general campus queries.</p>
+            <h4>📧 Email Confirmation</h4>
+            <p>Automated dispatch notification.</p>
           </div>
         </div>
       </div>
@@ -110,7 +108,7 @@
       <div class="info-card">
         <h3><i class="fa-solid fa-camera"></i> Issue Photo Guidance</h3>
         <img src="https://images.unsplash.com/photo-1541339907198-e08756dedf3f?q=80&w=800&auto=format&fit=crop" style="width:100%; border-radius:8px; height:180px; object-fit:cover; margin-bottom:10px;">
-        <p>You can now attach photos of classroom issues (e.g., damaged fan, flickering projector) directly to your complaint!</p>
+        <p>You can attach photos of classroom issues (e.g., damaged fan, flickering projector) directly to your complaint!</p>
       </div>
     </div>
 
@@ -126,23 +124,21 @@
         <span><b>PRN:</b> <span id="dispPRN">-</span></span>
       </div>
 
-      <!-- Feature 4: FAQ vs Complaint Prompts -->
       <div class="chips-container">
-        <button class="chip" onclick="sendChip('The fan in room 302 is not working')">💡 Fan Broken (Complaint)</button>
-        <button class="chip" onclick="sendChip('What are the central library working hours?')">📚 Library Hours (FAQ)</button>
+        <button class="chip" onclick="sendChip('The fan in room 302 is not working')">💡 Fan Broken</button>
         <button class="chip" onclick="sendChip('Wi-Fi is disconnected in Library')">📶 Wi-Fi Issue</button>
+        <button class="chip" onclick="sendChip('Projector flickering in Lab 2')">🖥️ Projector Issue</button>
       </div>
 
       <div class="messages-box" id="chatBox"></div>
 
-      <!-- Input Area with Feature 2 Attachment Upload -->
       <div class="input-area">
         <label class="attach-btn" title="Attach Image">
           <i class="fa-solid fa-paperclip"></i>
           <input type="file" id="fileInput" accept="image/*" style="display:none;" onchange="handleImageUpload(event)">
         </label>
         <img id="imgPreview" class="image-preview">
-        <input type="text" id="userInput" placeholder="Type your complaint or question..." onkeypress="handleKeyPress(event)">
+        <input type="text" id="userInput" placeholder="Type your complaint or issue..." onkeypress="handleKeyPress(event)">
         <button class="send-btn" onclick="sendMessage()">Send</button>
       </div>
     </div>
@@ -153,6 +149,7 @@
   <div class="modal" id="registerModal">
     <div class="modal-content">
       <h3>👤 Student Details</h3>
+      <p style="font-size:0.8rem; color:#64748b; margin-bottom:15px;">Please register your details before submitting a complaint.</p>
       <div class="form-group">
         <label>Full Name</label>
         <input type="text" id="regName" placeholder="e.g. John Doe">
@@ -244,8 +241,7 @@
     div.className = `message ${sender === 'user' ? 'user-message' : 'bot-message'}`;
     div.innerText = text;
 
-    // Only show Email Confirmation Banner IF an official Ticket ID was created (Complaints only, not FAQs)
-    if (ticketId && ticketId !== "None" && ticketId.includes("CMP-")) {
+    if (ticketId) {
       const emailBox = document.createElement("div");
       emailBox.className = "email-banner";
       emailBox.innerHTML = `<i class="fa-solid fa-envelope-circle-check"></i> <div><b>Email Confirmation Sent!</b><br>Confirmation dispatched to student record (${currentStudent.prn}).</div>`;
@@ -256,7 +252,6 @@
     chatBox.scrollTop = chatBox.scrollHeight;
   }
 
-  // FIXED: Automatically sends message when chip is clicked
   function sendChip(text) {
     document.getElementById("userInput").value = text;
     sendMessage();
@@ -327,7 +322,7 @@
       } else {
         resultsDiv.innerHTML = data.tickets.map(t => `
           <div style="border-bottom:1px solid #e2e8f0; padding:8px 0;">
-            <b>Ticket:</b> ${t.ticket_id || 'FAQ'} | <b>PRN:</b> ${t.prn}<br>
+            <b>Ticket:</b> ${t.ticket_id} | <b>PRN:</b> ${t.prn}<br>
             <b>Status:</b> <span style="color:${t.status==='Resolved'?'green':'orange'}; font-weight:bold;">${t.status}</span><br>
             <b>Issue:</b> ${t.user_message}
           </div>
@@ -340,5 +335,6 @@
 
   function handleKeyPress(e) { if (e.key === "Enter") sendMessage(); }
 </script>
+
 </body>
 </html>

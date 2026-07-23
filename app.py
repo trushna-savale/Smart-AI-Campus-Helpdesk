@@ -22,15 +22,12 @@ app.add_middleware(
 DB_FILE = "helpdesk.db"
 
 def init_db():
-    """Initializes the database and ensures all required columns exist."""
     conn = sqlite3.connect(DB_FILE)
     cursor = conn.cursor()
-    
-    # Create table with complete schema from scratch
     cursor.execute("""
         CREATE TABLE IF NOT EXISTS chat_logs (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
-            ticket_id TEXT,
+            ticket_id TEXT UNIQUE,
             timestamp TEXT NOT NULL,
             student_name TEXT DEFAULT 'Anonymous',
             prn TEXT DEFAULT 'N/A',
@@ -43,37 +40,13 @@ def init_db():
         )
     """)
     conn.commit()
-
-    # Dynamic Column Addition Safety Check
-    cursor.execute("PRAGMA table_info(chat_logs)")
-    existing_cols = [col[1] for col in cursor.fetchall()]
-
-    required_cols = {
-        "student_name": "TEXT DEFAULT 'Anonymous'",
-        "prn": "TEXT DEFAULT 'N/A'",
-        "section": "TEXT DEFAULT 'N/A'",
-        "image_data": "TEXT DEFAULT NULL"
-    }
-
-    for col_name, col_def in required_cols.items():
-        if col_name not in existing_cols:
-            try:
-                cursor.execute(f"ALTER TABLE chat_logs ADD COLUMN {col_name} {col_def}")
-            except Exception as e:
-                print(f"Column migration notice for {col_name}: {e}")
-
-    conn.commit()
     conn.close()
 
-# Run init on startup
 init_db()
 
 def extract_ticket_info(bot_response: str):
     ticket_match = re.search(r'CMP-\d+', bot_response)
-    if not ticket_match:
-        return None, "FAQ/General"
-        
-    ticket_id = ticket_match.group(0)
+    ticket_id = ticket_match.group(0) if ticket_match else f"CMP-{int(datetime.utcnow().timestamp()) % 1000000:06d}"
     
     category = "General"
     bot_lower = bot_response.lower()
@@ -89,15 +62,13 @@ def extract_ticket_info(bot_response: str):
 def log_to_db(student_name: str, prn: str, section: str, user_message: str, bot_response: str, image_data: str = None):
     try:
         ticket_id, category = extract_ticket_info(bot_response)
-        status = 'Open' if ticket_id else 'Resolved (FAQ)'
-        
         conn = sqlite3.connect(DB_FILE)
         cursor = conn.cursor()
         cursor.execute(
             """INSERT INTO chat_logs 
                (ticket_id, timestamp, student_name, prn, section, user_message, bot_response, status, category, image_data) 
                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
-            (ticket_id, datetime.utcnow().strftime("%Y-%m-%d %H:%M:%S"), student_name, prn, section, user_message, bot_response, status, category, image_data)
+            (ticket_id, datetime.utcnow().strftime("%Y-%m-%d %H:%M:%S"), student_name, prn, section, user_message, bot_response, 'Open', category, image_data)
         )
         conn.commit()
         conn.close()
@@ -109,15 +80,10 @@ def log_to_db(student_name: str, prn: str, section: str, user_message: str, bot_
 SYSTEM_INSTRUCTION = """
 You are the Smart AI Campus Helpdesk assistant.
 
-RULES:
-1. FAQ / GENERAL INQUIRIES (Library hours, campus directions, syllabus, IT contact details):
-   - Answer the student's question directly and politely.
-   - DO NOT generate a ticket or Ticket ID for simple questions.
 
-2. COMPLAINTS & ISSUE REPORTS (Broken fan, Wi-Fi down, damaged projector, lost item):
-   - Generate an official support ticket in this exact format:
+For EVERY complaint reported, generate an official support ticket in this format:
 
-   You are an AI Smart Campus Helpdesk Assistant.
+
 Your job is to help students register campus complaints professionally.
 
 REQUIRED INFORMATION TO REGISTER:
@@ -192,6 +158,8 @@ Smart Campus Helpdesk Team
 
 --------------------------------------------------
 
+
+Be clear, professional, and reassuring.
 """
 
 class QueryRequest(BaseModel):
@@ -218,9 +186,9 @@ def chat(request: QueryRequest):
             
         client = Groq(api_key=api_key)
         
-        prompt_content = f"Student Info: Name={request.student_name}, PRN={request.prn}, Section={request.section}. Question/Issue: {request.message}"
+        prompt_content = f"Student Info: Name={request.student_name}, PRN={request.prn}, Section={request.section}. Issue: {request.message}"
         if request.image_data:
-            prompt_content += " [Image Attached by student]."
+            prompt_content += " [Note: Photo proof attached by student]."
 
         chat_completion = client.chat.completions.create(
             messages=[
@@ -290,7 +258,7 @@ def get_analytics():
     conn = sqlite3.connect(DB_FILE)
     cursor = conn.cursor()
     
-    cursor.execute("SELECT COUNT(*) FROM chat_logs WHERE ticket_id IS NOT NULL")
+    cursor.execute("SELECT COUNT(*) FROM chat_logs")
     total = cursor.fetchone()[0]
     
     cursor.execute("SELECT COUNT(*) FROM chat_logs WHERE status = 'Open'")
@@ -299,7 +267,7 @@ def get_analytics():
     cursor.execute("SELECT COUNT(*) FROM chat_logs WHERE status = 'Resolved'")
     resolved_tickets = cursor.fetchone()[0]
     
-    cursor.execute("SELECT category, COUNT(*) FROM chat_logs WHERE category != 'FAQ/General' GROUP BY category ORDER BY COUNT(*) DESC LIMIT 1")
+    cursor.execute("SELECT category, COUNT(*) FROM chat_logs GROUP BY category ORDER BY COUNT(*) DESC LIMIT 1")
     top_cat = cursor.fetchone()
     top_category = top_cat[0] if top_cat else "None"
     
