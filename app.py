@@ -101,7 +101,7 @@ INSTRUCTIONS:
 --------------------------------------------------
 SMART CAMPUS HELPDESK REPORT
 
-Ticket ID: CMP-[Generate 6 random digits]
+Ticket ID: CMP-XXXXXX (6 digits)
 Complaint:
 
 Category:
