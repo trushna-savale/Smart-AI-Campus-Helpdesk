@@ -40,15 +40,29 @@ def init_db():
         )
     """)
     conn.commit()
+
+    # AUTO-FIX SCHEMA: Add missing columns if database was created with old schema
+    cursor.execute("PRAGMA table_info(chat_logs)")
+    columns = [column[1] for column in cursor.fetchall()]
+    
+    if "student_name" not in columns:
+        cursor.execute("ALTER TABLE chat_logs ADD COLUMN student_name TEXT DEFAULT 'Anonymous'")
+    if "prn" not in columns:
+        cursor.execute("ALTER TABLE chat_logs ADD COLUMN prn TEXT DEFAULT 'N/A'")
+    if "section" not in columns:
+        cursor.execute("ALTER TABLE chat_logs ADD COLUMN section TEXT DEFAULT 'N/A'")
+    if "image_data" not in columns:
+        cursor.execute("ALTER TABLE chat_logs ADD COLUMN image_data TEXT DEFAULT NULL")
+        
+    conn.commit()
     conn.close()
 
 init_db()
 
 def extract_ticket_info(bot_response: str):
-    """Parses ticket ID and category if present in AI output."""
     ticket_match = re.search(r'CMP-\d+', bot_response)
     if not ticket_match:
-        return None, "FAQ/General"  # Feature 4: No ticket generated for simple queries
+        return None, "FAQ/General"
         
     ticket_id = ticket_match.group(0)
     
@@ -83,7 +97,6 @@ def log_to_db(student_name: str, prn: str, section: str, user_message: str, bot_
         print(f"Database logging error: {e}")
         return None
 
-# FEATURE 4: FAQ / Ticket Deflection Prompt Rules
 SYSTEM_INSTRUCTION = """
 You are the Smart AI Campus Helpdesk assistant.
 
@@ -95,6 +108,7 @@ RULES:
 2. COMPLAINTS & ISSUE REPORTS (Broken fan, Wi-Fi down, damaged projector, lost item):
    - Generate an official support ticket in this exact format:
 
+You are an AI Smart Campus Helpdesk Assistant.
 Your job is to help students register campus complaints professionally.
 
 REQUIRED INFORMATION TO REGISTER:
