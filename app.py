@@ -29,6 +29,9 @@ def init_db():
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             ticket_id TEXT UNIQUE,
             timestamp TEXT NOT NULL,
+            student_name TEXT DEFAULT 'Anonymous',
+            prn TEXT DEFAULT 'N/A',
+            section TEXT DEFAULT 'N/A',
             user_message TEXT NOT NULL,
             bot_response TEXT NOT NULL,
             status TEXT DEFAULT 'Open',
@@ -41,28 +44,30 @@ def init_db():
 init_db()
 
 def extract_ticket_info(bot_response: str):
-    """Parses ticket ID and category from AI output using Regex."""
     ticket_match = re.search(r'CMP-\d+', bot_response)
     ticket_id = ticket_match.group(0) if ticket_match else f"CMP-{int(datetime.utcnow().timestamp()) % 1000000:06d}"
     
     category = "General"
-    if "Electrical" in bot_response or "fan" in bot_response.lower():
+    bot_lower = bot_response.lower()
+    if "electrical" in bot_lower or "fan" in bot_lower or "light" in bot_lower:
         category = "Electrical"
-    elif "IT" in bot_response or "wifi" in bot_response.lower():
+    elif "it" in bot_lower or "wifi" in bot_lower or "internet" in bot_lower:
         category = "IT Support"
-    elif "Maintenance" in bot_response:
+    elif "maintenance" in bot_lower or "cleaning" in bot_lower:
         category = "Maintenance"
         
     return ticket_id, category
 
-def log_to_db(user_message: str, bot_response: str):
+def log_to_db(student_name: str, prn: str, section: str, user_message: str, bot_response: str):
     try:
         ticket_id, category = extract_ticket_info(bot_response)
         conn = sqlite3.connect(DB_FILE)
         cursor = conn.cursor()
         cursor.execute(
-            "INSERT INTO chat_logs (ticket_id, timestamp, user_message, bot_response, status, category) VALUES (?, ?, ?, ?, ?, ?)",
-            (ticket_id, datetime.utcnow().strftime("%Y-%m-%d %H:%M:%S"), user_message, bot_response, 'Open', category)
+            """INSERT INTO chat_logs 
+               (ticket_id, timestamp, student_name, prn, section, user_message, bot_response, status, category) 
+               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+            (ticket_id, datetime.utcnow().strftime("%Y-%m-%d %H:%M:%S"), student_name, prn, section, user_message, bot_response, 'Open', category)
         )
         conn.commit()
         conn.close()
@@ -71,7 +76,6 @@ def log_to_db(user_message: str, bot_response: str):
         print(f"Database logging error: {e}")
         return None
 
-# Paste your full Langflow system prompt here!
 SYSTEM_INSTRUCTION = """
 You are an AI Smart Campus Helpdesk Assistant.
 Your job is to help students register campus complaints professionally.
@@ -149,11 +153,14 @@ Smart Campus Helpdesk Team
 --------------------------------------------------
 
 
-Provide clear, structured, and helpful responses.
+Be helpful, polite, and clear.
 """
 
 class QueryRequest(BaseModel):
     message: str
+    student_name: str = "Anonymous"
+    prn: str = "N/A"
+    section: str = "N/A"
 
 class StatusUpdateRequest(BaseModel):
     ticket_id: str
@@ -175,32 +182,31 @@ def chat(request: QueryRequest):
         chat_completion = client.chat.completions.create(
             messages=[
                 {"role": "system", "content": SYSTEM_INSTRUCTION},
-                {"role": "user", "content": request.message}
+                {"role": "user", "content": f"Student Info: Name={request.student_name}, PRN={request.prn}, Section={request.section}. Issue: {request.message}"}
             ],
             model="llama-3.3-70b-versatile",
         )
         
         bot_reply = chat_completion.choices[0].message.content
-        ticket_id = log_to_db(request.message, bot_reply)
+        ticket_id = log_to_db(request.student_name, request.prn, request.section, request.message, bot_reply)
         
         return {"response": bot_reply, "ticket_id": ticket_id}
     except Exception as e:
         return {"error": str(e)}
 
-# FEATURE 2: TICKET SEARCH ENDPOINT
-@app.get("/ticket/{ticket_id}")
-def get_ticket(ticket_id: str):
+# LOOKUP TICKET BY TICKET ID OR PRN
+@app.get("/ticket/{query}")
+def get_ticket(query: str):
     conn = sqlite3.connect(DB_FILE)
     conn.row_factory = sqlite3.Row
     cursor = conn.cursor()
-    cursor.execute("SELECT * FROM chat_logs WHERE ticket_id = ?", (ticket_id,))
-    row = cursor.fetchone()
+    cursor.execute("SELECT * FROM chat_logs WHERE ticket_id = ? OR prn = ? ORDER BY id DESC", (query, query))
+    rows = cursor.fetchall()
     conn.close()
-    if row:
-        return dict(row)
-    return {"error": "Ticket not found"}
+    if rows:
+        return {"tickets": [dict(r) for r in rows]}
+    return {"error": "No records found for given Ticket ID or PRN"}
 
-# FEATURE 3: ADMIN LOGS & UPDATE ENDPOINTS
 @app.get("/admin/logs")
 def get_all_logs():
     conn = sqlite3.connect(DB_FILE)
@@ -220,25 +226,23 @@ def update_status(req: StatusUpdateRequest):
     conn.close()
     return {"status": "success", "ticket_id": req.ticket_id, "new_status": req.status}
 
-# FEATURE 4: EXPORT TO CSV
 @app.get("/admin/export-csv")
 def export_csv():
     conn = sqlite3.connect(DB_FILE)
     cursor = conn.cursor()
-    cursor.execute("SELECT ticket_id, timestamp, category, status, user_message FROM chat_logs")
+    cursor.execute("SELECT ticket_id, timestamp, student_name, prn, section, category, status, user_message FROM chat_logs")
     rows = cursor.fetchall()
     conn.close()
 
     output = io.StringIO()
     writer = csv.writer(output)
-    writer.writerow(["Ticket ID", "Timestamp", "Category", "Status", "User Message"])
+    writer.writerow(["Ticket ID", "Timestamp", "Name", "PRN", "Section", "Category", "Status", "User Message"])
     writer.writerows(rows)
 
     response = Response(content=output.getvalue(), media_type="text/csv")
     response.headers["Content-Disposition"] = "attachment; filename=campus_tickets.csv"
     return response
 
-# FEATURE 5: ANALYTICS METRICS
 @app.get("/admin/analytics")
 def get_analytics():
     conn = sqlite3.connect(DB_FILE)

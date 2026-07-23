@@ -3,11 +3,11 @@
 <head>
   <meta charset="UTF-8">
   <title>Helpdesk Admin Portal</title>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
   <style>
     body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background: #f1f5f9; margin: 0; padding: 25px; }
-    h1 { margin-bottom: 20px; color: #1e293b; }
+    h1 { margin-bottom: 20px; color: #1e293b; display: flex; align-items: center; gap: 10px; }
     
-    /* Feature 5: Analytics Metric Cards */
     .metrics-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 15px; margin-bottom: 25px; }
     .card { background: white; padding: 18px; border-radius: 10px; box-shadow: 0 4px 6px rgba(0,0,0,0.05); }
     .card-title { font-size: 0.8rem; color: #64748b; font-weight: bold; text-transform: uppercase; }
@@ -25,9 +25,8 @@
 </head>
 <body>
 
-  <h1>📊 Helpdesk Admin Portal</h1>
+  <h1><i class="fa-solid fa-user-shield"></i> Campus Helpdesk Admin Dashboard</h1>
 
-  <!-- Feature 5: Analytics Metrics -->
   <div class="metrics-grid">
     <div class="card"><div class="card-title">Total Tickets</div><div class="card-value" id="metricTotal">0</div></div>
     <div class="card"><div class="card-title">Open Tickets</div><div class="card-value" id="metricOpen" style="color:#ef4444;">0</div></div>
@@ -36,21 +35,21 @@
   </div>
 
   <div class="action-bar">
-    <h3>All Complaint Tickets</h3>
-    <!-- Feature 4: CSV Export -->
-    <a href="https://smart-ai-campus-helpdesk.onrender.com/admin/export-csv" class="btn btn-green">📥 Export to CSV</a>
+    <h3>Registered Student Complaints</h3>
+    <a href="https://smart-ai-campus-helpdesk.onrender.com/admin/export-csv" class="btn btn-green"><i class="fa-solid fa-file-csv"></i> Export to CSV</a>
   </div>
 
-  <!-- Feature 3: Styled Admin Table -->
   <table>
     <thead>
       <tr>
         <th>Ticket ID</th>
-        <th>Timestamp</th>
+        <th>Student Name</th>
+        <th>PRN</th>
+        <th>Section</th>
         <th>Category</th>
         <th>User Message</th>
         <th>Status</th>
-        <th>Action</th>
+        <th>Change Status</th>
       </tr>
     </thead>
     <tbody id="tableBody"></tbody>
@@ -83,7 +82,9 @@
       const row = document.createElement("tr");
       row.innerHTML = `
         <td><b>${ticket.ticket_id || '-'}</b></td>
-        <td>${ticket.timestamp}</td>
+        <td>${ticket.student_name || 'Anonymous'}</td>
+        <td>${ticket.prn || 'N/A'}</td>
+        <td>${ticket.section || 'N/A'}</td>
         <td>${ticket.category}</td>
         <td>${ticket.user_message}</td>
         <td><b>${ticket.status}</b></td>

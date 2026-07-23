@@ -4,94 +4,215 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Smart AI Campus Helpdesk</title>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
   <style>
-    * { box-sizing: border-box; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; }
-    body { background-color: #eef2f5; display: flex; justify-content: center; align-items: center; min-height: 100vh; margin: 0; padding: 15px; }
+    * { box-sizing: border-box; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; margin: 0; padding: 0; }
+    body { background-color: #f8fafc; color: #1e293b; min-height: 100vh; display: flex; flex-direction: column; }
     
-    .chat-container { width: 100%; max-width: 500px; height: 700px; background: #ffffff; border-radius: 12px; box-shadow: 0 8px 24px rgba(0,0,0,0.15); display: flex; flex-direction: column; overflow: hidden; }
-    
-    .chat-header { background: #4f46e5; color: white; padding: 14px 18px; display: flex; justify-content: space-between; align-items: center; }
-    .chat-title { font-size: 1.05rem; font-weight: 600; }
-    .header-btn { background: rgba(255, 255, 255, 0.2); color: white; border: none; padding: 5px 10px; border-radius: 6px; cursor: pointer; font-size: 0.75rem; font-weight: 600; margin-left: 4px; }
-    .header-btn:hover { background: rgba(255, 255, 255, 0.3); }
+    /* Header Navigation */
+    nav { background: #4f46e5; color: white; padding: 15px 30px; display: flex; justify-content: space-between; align-items: center; box-shadow: 0 4px 12px rgba(0,0,0,0.1); }
+    nav h1 { font-size: 1.3rem; display: flex; align-items: center; gap: 10px; }
+    .nav-btns { display: flex; gap: 10px; }
+    .nav-btn { background: rgba(255, 255, 255, 0.2); color: white; border: none; padding: 8px 16px; border-radius: 20px; cursor: pointer; font-weight: 600; text-decoration: none; font-size: 0.85rem; }
+    .nav-btn:hover { background: rgba(255, 255, 255, 0.35); }
 
-    /* Suggestion Chips (Feature 1) */
-    .chips-container { display: flex; gap: 6px; padding: 10px 15px; background: #f8fafc; border-bottom: 1px solid #e2e8f0; overflow-x: auto; }
-    .chip { background: #e0e7ff; color: #3730a3; border: none; padding: 6px 12px; border-radius: 16px; font-size: 0.78rem; font-weight: 600; cursor: pointer; white-space: nowrap; }
-    .chip:hover { background: #c7d2fe; }
+    /* Hero Banner Section */
+    .hero { background: linear-gradient(rgba(79, 70, 229, 0.85), rgba(67, 56, 202, 0.85)), url('https://images.unsplash.com/photo-1523050854058-8df90110c9f1?q=80&w=1200&auto=format&fit=crop'); background-size: cover; background-position: center; color: white; text-align: center; padding: 60px 20px; }
+    .hero h2 { font-size: 2.2rem; margin-bottom: 10px; }
+    .hero p { font-size: 1.1rem; opacity: 0.9; max-width: 600px; margin: 0 auto 20px; }
     
-    .messages-box { flex: 1; padding: 18px; overflow-y: auto; display: flex; flex-direction: column; gap: 12px; }
+    /* Main Layout */
+    .container { max-width: 1100px; margin: -30px auto 40px; padding: 0 20px; display: grid; grid-template-columns: 1fr 450px; gap: 25px; flex: 1; }
+    @media (max-width: 850px) { .container { grid-template-columns: 1fr; } }
+
+    /* Info Cards */
+    .info-card { background: white; border-radius: 12px; padding: 25px; box-shadow: 0 4px 15px rgba(0,0,0,0.05); margin-bottom: 20px; }
+    .info-card h3 { color: #4f46e5; margin-bottom: 12px; display: flex; align-items: center; gap: 8px; }
+    .info-card p { color: #64748b; line-height: 1.6; font-size: 0.95rem; }
     
-    .message { max-width: 85%; padding: 12px 16px; border-radius: 16px; line-height: 1.5; font-size: 0.9rem; white-space: pre-wrap; word-break: break-word; }
-    .bot-message { background: #f3f4f6; color: #1f2937; align-self: flex-start; border-bottom-left-radius: 4px; border: 1px solid #e5e7eb; }
-    .user-message { background: #4f46e5; color: white; align-self: flex-end; border-bottom-right-radius: 4px; }
+    .features-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 15px; margin-top: 15px; }
+    .feature-item { background: #f1f5f9; padding: 15px; border-radius: 8px; border-left: 4px solid #4f46e5; }
+    .feature-item h4 { font-size: 0.9rem; color: #1e293b; margin-bottom: 4px; }
+    .feature-item p { font-size: 0.8rem; color: #64748b; }
+
+    /* Chat Container */
+    .chat-container { background: white; border-radius: 12px; box-shadow: 0 8px 24px rgba(0,0,0,0.1); display: flex; flex-direction: column; height: 600px; overflow: hidden; border: 1px solid #e2e8f0; }
+    .chat-header { background: #4f46e5; color: white; padding: 14px 18px; display: flex; justify-content: space-between; align-items: center; }
     
-    .input-area { display: flex; border-top: 1px solid #e5e7eb; padding: 12px; background: #ffffff; gap: 8px; }
-    input { flex: 1; border: 1px solid #d1d5db; border-radius: 20px; padding: 10px 16px; outline: none; font-size: 0.9rem; }
-    button.send-btn { background: #4f46e5; color: white; border: none; border-radius: 20px; padding: 0 18px; cursor: pointer; font-weight: 600; }
+    .student-badge { background: #f1f5f9; padding: 8px 15px; font-size: 0.82rem; color: #475569; display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid #e2e8f0; }
     
-    /* Search Modal (Feature 2) */
-    .modal { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); justify-content: center; align-items: center; }
-    .modal-content { background: white; padding: 20px; border-radius: 10px; width: 350px; text-align: center; }
+    .chips-container { display: flex; gap: 6px; padding: 8px 12px; background: #fafafa; border-bottom: 1px solid #e2e8f0; overflow-x: auto; }
+    .chip { background: #e0e7ff; color: #3730a3; border: none; padding: 5px 10px; border-radius: 14px; font-size: 0.75rem; font-weight: 600; cursor: pointer; white-space: nowrap; }
+
+    .messages-box { flex: 1; padding: 15px; overflow-y: auto; display: flex; flex-direction: column; gap: 10px; }
+    .message { max-width: 85%; padding: 10px 14px; border-radius: 14px; line-height: 1.4; font-size: 0.88rem; white-space: pre-wrap; word-break: break-word; }
+    .bot-message { background: #f1f5f9; color: #1e2937; align-self: flex-start; border-bottom-left-radius: 2px; }
+    .user-message { background: #4f46e5; color: white; align-self: flex-end; border-bottom-right-radius: 2px; }
+
+    .input-area { display: flex; padding: 10px; border-top: 1px solid #e2e8f0; gap: 8px; }
+    input[type="text"] { flex: 1; border: 1px solid #cbd5e1; border-radius: 20px; padding: 8px 14px; outline: none; font-size: 0.88rem; }
+    button.send-btn { background: #4f46e5; color: white; border: none; border-radius: 20px; padding: 0 16px; cursor: pointer; font-weight: 600; }
+
+    /* Modals */
+    .modal { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); justify-content: center; align-items: center; z-index: 100; }
+    .modal-content { background: white; padding: 25px; border-radius: 12px; width: 380px; box-shadow: 0 10px 25px rgba(0,0,0,0.2); }
+    .modal-content h3 { margin-bottom: 15px; color: #1e293b; }
+    .form-group { margin-bottom: 12px; text-align: left; }
+    .form-group label { display: block; font-size: 0.8rem; font-weight: bold; margin-bottom: 4px; color: #475569; }
+    .form-group input { width: 100%; padding: 8px 12px; border: 1px solid #cbd5e1; border-radius: 6px; font-size: 0.88rem; }
   </style>
 </head>
 <body>
 
-<div class="chat-container">
-  <div class="chat-header">
-    <div class="chat-title">🏫 Campus Helpdesk</div>
+  <nav>
+    <h1><i class="fa-solid fa-graduation-cap"></i> Smart Campus Helpdesk</h1>
+    <div class="nav-btns">
+      <button class="nav-btn" onclick="openLookupModal()"><i class="fa-solid fa-magnifying-glass"></i> Track Ticket</button>
+      <a href="admin.html" class="nav-btn" style="background: #10b981;"><i class="fa-solid fa-user-shield"></i> Admin Portal</a>
+    </div>
+  </nav>
+
+  <div class="hero">
+    <h2>Instant AI Support for Campus Needs</h2>
+    <p>Report classroom maintenance, Wi-Fi connectivity, or facility issues instantly and track ticket status in real-time.</p>
+  </div>
+
+  <div class="container">
+    
+    <!-- Info Section -->
     <div>
-      <button class="header-btn" onclick="openModal()">🔍 Lookup</button>
-      <button class="header-btn" onclick="clearChat()">🗑️ Clear</button>
+      <div class="info-card">
+        <h3><i class="fa-solid fa-circle-info"></i> About the AI Helpdesk</h3>
+        <p>Welcome to the central Smart Campus Helpdesk portal. Powered by LLMs, our assistant categorizes complaints, routes requests to appropriate campus departments, and generates official tracking tickets.</p>
+        
+        <div class="features-grid">
+          <div class="feature-item">
+            <h4>⚡ Instant Logging</h4>
+            <p>24/7 automated issue registration.</p>
+          </div>
+          <div class="feature-item">
+            <h4>📍 Real-Time Tracking</h4>
+            <p>Track resolution status via PRN or Ticket ID.</p>
+          </div>
+          <div class="feature-item">
+            <h4>🛠️ Auto Routing</h4>
+            <p>Direct dispatch to Facilities or IT team.</p>
+          </div>
+          <div class="feature-item">
+            <h4>📊 Live Admin Updates</h4>
+            <p>Transparent progress updates.</p>
+          </div>
+        </div>
+      </div>
+
+      <div class="info-card">
+        <h3><link rel="stylesheet" href=""> Campus Assistance Overview</h3>
+        <img src="https://images.unsplash.com/photo-1541339907198-e08756dedf3f?q=80&w=800&auto=format&fit=crop" style="width:100%; border-radius:8px; height:180px; object-fit:cover; margin-bottom:10px;">
+        <p>Ensure your classroom room numbers and specific details (e.g., Fan, Light, Wi-Fi Router) are included in the prompt for faster resolution.</p>
+      </div>
+    </div>
+
+    <!-- Chat Assistant Section -->
+    <div class="chat-container">
+      <div class="chat-header">
+        <div><b>💬 AI Support Chat</b></div>
+        <button class="nav-btn" style="font-size:0.75rem; padding:4px 10px;" onclick="openRegisterModal()">Edit Info</button>
+      </div>
+
+      <div class="student-badge" id="studentDisplay">
+        <span>👤 <b>Student:</b> <span id="dispName">Not Registered</span></span>
+        <span><b>PRN:</b> <span id="dispPRN">-</span></span>
+      </div>
+
+      <div class="chips-container">
+        <button class="chip" onclick="sendChip('The fan in room 302 is not working')">💡 Fan Broken</button>
+        <button class="chip" onclick="sendChip('Wi-Fi is disconnected in Library')">📶 Wi-Fi Issue</button>
+        <button class="chip" onclick="sendChip('Need replacement for Lost ID Card')">🔑 Lost ID</button>
+      </div>
+
+      <div class="messages-box" id="chatBox"></div>
+
+      <div class="input-area">
+        <input type="text" id="userInput" placeholder="Type your complaint..." onkeypress="handleKeyPress(event)">
+        <button class="send-btn" onclick="sendMessage()">Send</button>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- Student Registration Modal -->
+  <div class="modal" id="registerModal">
+    <div class="modal-content">
+      <h3>👤 Student Details</h3>
+      <p style="font-size:0.8rem; color:#64748b; margin-bottom:15px;">Please register your details before submitting a complaint.</p>
+      <div class="form-group">
+        <label>Full Name</label>
+        <input type="text" id="regName" placeholder="e.g. John Doe">
+      </div>
+      <div class="form-group">
+        <label>PRN / Roll No.</label>
+        <input type="text" id="regPRN" placeholder="e.g. 22010854">
+      </div>
+      <div class="form-group">
+        <label>Section / Class</label>
+        <input type="text" id="regSection" placeholder="e.g. CS-B">
+      </div>
+      <button class="send-btn" style="width:100%; padding:10px; border-radius:6px;" onclick="saveStudentDetails()">Save & Continue</button>
     </div>
   </div>
 
-  <!-- Feature 1: Quick Action Suggestion Chips -->
-  <div class="chips-container">
-    <button class="chip" onclick="sendChip('The fan in room 302 is not working')">💡 Fan Broken</button>
-    <button class="chip" onclick="sendChip('Wi-Fi is disconnected in Library')">📶 Wi-Fi Issue</button>
-    <button class="chip" onclick="sendChip('Need replacement for Lost ID Card')">🔑 Lost ID Card</button>
-    <button class="chip" onclick="sendChip('Projector in Lab 2 is flicking')">🖥️ Projector</button>
+  <!-- Lookup Modal -->
+  <div class="modal" id="lookupModal">
+    <div class="modal-content">
+      <h3>🔍 Track Complaint Status</h3>
+      <div class="form-group">
+        <label>Enter Ticket ID or PRN</label>
+        <input type="text" id="lookupInput" placeholder="e.g. CMP-854239 or 22010854">
+      </div>
+      <button class="send-btn" style="width:100%; padding:8px;" onclick="trackTicket()">Search</button>
+      <button class="nav-btn" style="background:#ef4444; width:100%; margin-top:8px; padding:8px; border-radius:6px;" onclick="closeLookupModal()">Close</button>
+      <div id="lookupResults" style="margin-top:15px; max-height:200px; overflow-y:auto; text-align:left; font-size:0.85rem;"></div>
+    </div>
   </div>
-
-  <div class="messages-box" id="chatBox"></div>
-
-  <div class="input-area">
-    <input type="text" id="userInput" placeholder="Ask about campus issues..." onkeypress="handleKeyPress(event)">
-    <button class="send-btn" onclick="sendMessage()">Send</button>
-  </div>
-</div>
-
-<!-- Feature 2: Ticket Search Modal -->
-<div class="modal" id="ticketModal">
-  <div class="modal-content">
-    <h3>🔍 Lookup Ticket Status</h3>
-    <input type="text" id="ticketSearchInput" placeholder="Enter Ticket ID (e.g., CMP-123456)" style="width: 100%; margin-bottom: 10px;">
-    <button class="send-btn" onclick="searchTicket()" style="padding: 8px 16px;">Search</button>
-    <button class="header-btn" style="background: #ef4444; padding: 8px 16px; margin-top: 5px;" onclick="closeModal()">Close</button>
-    <div id="searchResult" style="margin-top: 15px; text-align: left; font-size: 0.85rem;"></div>
-  </div>
-</div>
 
 <script>
   const API_URL = "https://smart-ai-campus-helpdesk.onrender.com";
-  const DEFAULT_WELCOME = [{ sender: 'bot', text: 'Hello! Welcome to the Smart Campus Helpdesk. How can I assist you today?' }];
+  let currentStudent = { name: "Anonymous", prn: "N/A", section: "N/A" };
 
-  window.onload = function() { loadChatHistory(); };
+  window.onload = function() {
+    const saved = localStorage.getItem('studentData');
+    if (saved) {
+      currentStudent = JSON.parse(saved);
+      updateStudentDisplay();
+    } else {
+      openRegisterModal();
+    }
+    appendMessageUI('bot', 'Hello! Welcome to the Smart Campus Helpdesk. How can I assist you today?');
+  };
 
-  function loadChatHistory() {
-    const saved = localStorage.getItem('chatHistory');
-    const messages = saved ? JSON.parse(saved) : DEFAULT_WELCOME;
-    const chatBox = document.getElementById("chatBox");
-    chatBox.innerHTML = "";
-    messages.forEach(msg => appendMessageUI(msg.sender, msg.text));
+  function openRegisterModal() { document.getElementById('registerModal').style.display = 'flex'; }
+  function openLookupModal() { document.getElementById('lookupModal').style.display = 'flex'; }
+  function closeLookupModal() { document.getElementById('lookupModal').style.display = 'none'; }
+
+  function saveStudentDetails() {
+    const name = document.getElementById('regName').value.trim();
+    const prn = document.getElementById('regPRN').value.trim();
+    const section = document.getElementById('regSection').value.trim();
+
+    if (!name || !prn) {
+      alert("Please fill in Name and PRN!");
+      return;
+    }
+
+    currentStudent = { name, prn, section: section || 'N/A' };
+    localStorage.setItem('studentData', JSON.stringify(currentStudent));
+    updateStudentDisplay();
+    document.getElementById('registerModal').style.display = 'none';
   }
 
-  function saveMessageToStorage(sender, text) {
-    const saved = localStorage.getItem('chatHistory');
-    const messages = saved ? JSON.parse(saved) : [];
-    messages.push({ sender, text });
-    localStorage.setItem('chatHistory', JSON.stringify(messages));
+  function updateStudentDisplay() {
+    document.getElementById('dispName').innerText = `${currentStudent.name} (${currentStudent.section})`;
+    document.getElementById('dispPRN').innerText = currentStudent.prn;
   }
 
   function appendMessageUI(sender, text) {
@@ -113,8 +234,12 @@
     const userText = inputField.value.trim();
     if (!userText) return;
 
+    if (currentStudent.name === "Anonymous") {
+      openRegisterModal();
+      return;
+    }
+
     appendMessageUI('user', userText);
-    saveMessageToStorage('user', userText);
     inputField.value = "";
 
     const chatBox = document.getElementById("chatBox");
@@ -128,51 +253,46 @@
       const response = await fetch(`${API_URL}/chat`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ message: userText })
+        body: JSON.stringify({ 
+          message: userText,
+          student_name: currentStudent.name,
+          prn: currentStudent.prn,
+          section: currentStudent.section
+        })
       });
 
       const data = await response.json();
-      const botReply = data.response || "Sorry, I couldn't process that.";
-      
       chatBox.removeChild(loadingDiv);
-      appendMessageUI('bot', botReply);
-      saveMessageToStorage('bot', botReply);
+      appendMessageUI('bot', data.response || "Error processing request.");
     } catch (err) {
       chatBox.removeChild(loadingDiv);
-      appendMessageUI('bot', "Error connecting to server.");
+      appendMessageUI('bot', "Error connecting to backend service.");
     }
   }
 
-  function openModal() { document.getElementById("ticketModal").style.display = "flex"; }
-  function closeModal() { document.getElementById("ticketModal").style.display = "none"; }
+  async function trackTicket() {
+    const query = document.getElementById('lookupInput').value.trim();
+    const resultsDiv = document.getElementById('lookupResults');
+    if (!query) return;
 
-  async function searchTicket() {
-    const ticketId = document.getElementById("ticketSearchInput").value.trim();
-    const resultDiv = document.getElementById("searchResult");
-    if (!ticketId) return;
-
-    resultDiv.innerHTML = "Searching...";
+    resultsDiv.innerHTML = "Searching...";
     try {
-      const res = await fetch(`${API_URL}/ticket/${ticketId}`);
+      const res = await fetch(`${API_URL}/ticket/${query}`);
       const data = await res.json();
       if (data.error) {
-        resultDiv.innerHTML = `<span style="color:red;">${data.error}</span>`;
+        resultsDiv.innerHTML = `<span style="color:red;">${data.error}</span>`;
       } else {
-        resultDiv.innerHTML = `
-          <b>Ticket:</b> ${data.ticket_id}<br>
-          <b>Status:</b> <span style="color:green;font-weight:bold;">${data.status}</span><br>
-          <b>Category:</b> ${data.category}<br>
-          <b>Submitted:</b> ${data.timestamp}
-        `;
+        resultsDiv.innerHTML = data.tickets.map(t => `
+          <div style="border-bottom:1px solid #e2e8f0; padding:8px 0;">
+            <b>Ticket:</b> ${t.ticket_id} | <b>PRN:</b> ${t.prn}<br>
+            <b>Status:</b> <span style="color:${t.status==='Resolved'?'green':'orange'}; font-weight:bold;">${t.status}</span><br>
+            <b>Issue:</b> ${t.user_message}
+          </div>
+        `).join('');
       }
     } catch (err) {
-      resultDiv.innerHTML = "Error fetching ticket.";
+      resultsDiv.innerHTML = "Error retrieving ticket information.";
     }
-  }
-
-  function clearChat() {
-    localStorage.removeItem('chatHistory');
-    loadChatHistory();
   }
 
   function handleKeyPress(e) { if (e.key === "Enter") sendMessage(); }
