@@ -36,10 +36,22 @@ def init_db():
             user_message TEXT NOT NULL,
             bot_response TEXT NOT NULL,
             status TEXT DEFAULT 'Open',
-            category TEXT DEFAULT 'General'
+            category TEXT DEFAULT 'General',
+            image_data TEXT DEFAULT NULL
         )
     """)
     conn.commit()
+
+    # Dynamic Column Addition Safety Check
+    cursor.execute("PRAGMA table_info(chat_logs)")
+    existing_cols = [col[1] for col in cursor.fetchall()]
+    if "image_data" not in existing_cols:
+        try:
+            cursor.execute("ALTER TABLE chat_logs ADD COLUMN image_data TEXT DEFAULT NULL")
+            conn.commit()
+        except Exception as e:
+            print(f"Schema migration note: {e}")
+            
     conn.close()
 
 init_db()
@@ -54,27 +66,27 @@ def extract_ticket_info(bot_response: str):
         category = "Electrical"
     elif "it" in bot_lower or "wifi" in bot_lower or "internet" in bot_lower:
         category = "IT Support"
-    elif "maintenance" in bot_lower or "cleaning" in bot_lower or "projector" in bot_lower:
+    elif "maintenance" in bot_lower or "cleaning" in bot_lower or "projector" in bot_lower or "ac" in bot_lower:
         category = "Maintenance"
         
     return ticket_id, category
 
-def log_to_db(student_name: str, prn: str, section: str, user_message: str, bot_response: str):
+def log_to_db(student_name: str, prn: str, section: str, user_message: str, bot_response: str, image_data: str = None):
     try:
         ticket_id, category = extract_ticket_info(bot_response)
         conn = sqlite3.connect(DB_FILE)
         cursor = conn.cursor()
         cursor.execute(
             """INSERT INTO chat_logs 
-               (ticket_id, timestamp, student_name, prn, section, user_message, bot_response, status, category) 
-               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)""",
-            (ticket_id, datetime.utcnow().strftime("%Y-%m-%d %H:%M:%S"), student_name, prn, section, user_message, bot_response, 'Open', category)
+               (ticket_id, timestamp, student_name, prn, section, user_message, bot_response, status, category, image_data) 
+               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+            (ticket_id, datetime.utcnow().strftime("%Y-%m-%d %H:%M:%S"), student_name, prn, section, user_message, bot_response, 'Open', category, image_data)
         )
         conn.commit()
         conn.close()
         return ticket_id
     except Exception as e:
-        print(f"Database bypass notice: {e}")
+        print(f"Database logging notice: {e}")
         ticket_match = re.search(r'CMP-\d+', bot_response)
         return ticket_match.group(0) if ticket_match else f"CMP-{random.randint(100000, 999999)}"
 
@@ -82,15 +94,19 @@ SYSTEM_INSTRUCTION = """
 You are an AI Smart Campus Helpdesk Assistant.
 Your job is to help students register campus complaints professionally.
 
+
 REQUIRED INFORMATION TO REGISTER:
 1. Problem description (e.g., fan not working, AC broken, projector light flickering)
 2. Location/Classroom/Lab (e.g., classroom 432, computer lab 3)
 
+
 Conversation History so far:
 {history}
 
+
 Current Student Message:
 {input}
+
 
 INSTRUCTIONS:
 1. Carefully check the "Conversation History so far" to see what details the user has ALREADY provided in previous turns.
@@ -98,64 +114,87 @@ INSTRUCTIONS:
 3. IF problem description is missing: Ask ONLY for the problem description.
 4. IF BOTH location and problem description are provided across the conversation: Immediately output the complete SMART CAMPUS HELPDESK REPORT below.
 
+
 --------------------------------------------------
 SMART CAMPUS HELPDESK REPORT
+
 
 Ticket ID: CMP-XXXXXX (6 digits)
 Complaint:
 
+
 Category:
+
 
 Priority:
 (Low / Medium / High / Critical)
 
+
 Assigned Department:
+
 
 Assigned Engineer:
 Generate a realistic support engineer name.
 
+
 Current Status:
 Open
 
+
 Estimated Resolution Time:
+
 
 Immediate Actions:
 - Action 1
 - Action 2
 - Action 3
 
+
 Possible Root Cause:
+
 
 AI Recommendations:
 1.
 2.
 3.
 
+
 Email Draft:
+
 
 Subject: Complaint Registered Successfully
 
+
 Dear Student,
+
 
 Your complaint has been successfully registered.
 
+
 Ticket ID:
+
 
 Assigned Department:
 
+
 Priority:
+
 
 Estimated Resolution Time:
 
+
 Our support team will resolve the issue as soon as possible.
+
 
 Regards,
 Smart Campus Helpdesk Team
 
+
 --------------------------------------------------
 
 
-Be polite, helpful, and concise.
+
+Then follow up with a brief, polite closing statement.
 """
 
 class QueryRequest(BaseModel):
@@ -163,6 +202,7 @@ class QueryRequest(BaseModel):
     student_name: str = "Anonymous"
     prn: str = "N/A"
     section: str = "N/A"
+    image_data: str = None
 
 class StatusUpdateRequest(BaseModel):
     ticket_id: str
@@ -177,24 +217,28 @@ def chat(request: QueryRequest):
     try:
         api_key = os.getenv("GROQ_API_KEY")
         if not api_key:
-            return {"response": "GROQ_API_KEY environment variable is missing on server.", "ticket_id": None}
+            return {"response": "GROQ_API_KEY environment variable is missing.", "ticket_id": None}
             
         client = Groq(api_key=api_key)
         
+        prompt_content = f"Student Info: Name={request.student_name}, PRN={request.prn}, Section={request.section}. Issue: {request.message}"
+        if request.image_data:
+            prompt_content += " [Photo proof attached by student]."
+
         chat_completion = client.chat.completions.create(
             messages=[
                 {"role": "system", "content": SYSTEM_INSTRUCTION},
-                {"role": "user", "content": f"Student Info: Name={request.student_name}, PRN={request.prn}, Section={request.section}. Message: {request.message}"}
+                {"role": "user", "content": prompt_content}
             ],
             model="llama-3.3-70b-versatile",
         )
         
         bot_reply = chat_completion.choices[0].message.content
-        ticket_id = log_to_db(request.student_name, request.prn, request.section, request.message, bot_reply)
+        ticket_id = log_to_db(request.student_name, request.prn, request.section, request.message, bot_reply, request.image_data)
         
         return {"response": bot_reply, "ticket_id": ticket_id}
     except Exception as e:
-        return {"response": f"Error: {str(e)}", "ticket_id": None}
+        return {"response": f"Error processing request: {str(e)}", "ticket_id": None}
 
 @app.get("/ticket/{query}")
 def get_ticket(query: str):

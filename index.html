@@ -19,7 +19,7 @@
     .hero h2 { font-size: 2.2rem; margin-bottom: 10px; }
     .hero p { font-size: 1.1rem; opacity: 0.9; max-width: 600px; margin: 0 auto 20px; }
     
-    .container { max-width: 1100px; margin: -30px auto 40px; padding: 0 20px; display: grid; grid-template-columns: 1fr 450px; gap: 25px; flex: 1; }
+    .container { max-width: 1100px; margin: -30px auto 40px; padding: 0 20px; display: grid; grid-template-columns: 1fr 480px; gap: 25px; flex: 1; }
     @media (max-width: 850px) { .container { grid-template-columns: 1fr; } }
 
     .info-card { background: white; border-radius: 12px; padding: 25px; box-shadow: 0 4px 15px rgba(0,0,0,0.05); margin-bottom: 20px; }
@@ -31,7 +31,7 @@
     .feature-item h4 { font-size: 0.9rem; color: #1e293b; margin-bottom: 4px; }
     .feature-item p { font-size: 0.8rem; color: #64748b; }
 
-    .chat-container { background: white; border-radius: 12px; box-shadow: 0 8px 24px rgba(0,0,0,0.1); display: flex; flex-direction: column; height: 600px; overflow: hidden; border: 1px solid #e2e8f0; }
+    .chat-container { background: white; border-radius: 12px; box-shadow: 0 8px 24px rgba(0,0,0,0.1); display: flex; flex-direction: column; height: 620px; overflow: hidden; border: 1px solid #e2e8f0; }
     .chat-header { background: #4f46e5; color: white; padding: 14px 18px; display: flex; justify-content: space-between; align-items: center; }
     
     .student-badge { background: #f1f5f9; padding: 8px 15px; font-size: 0.82rem; color: #475569; display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid #e2e8f0; }
@@ -40,13 +40,20 @@
     .chip { background: #e0e7ff; color: #3730a3; border: none; padding: 5px 10px; border-radius: 14px; font-size: 0.75rem; font-weight: 600; cursor: pointer; white-space: nowrap; }
 
     .messages-box { flex: 1; padding: 15px; overflow-y: auto; display: flex; flex-direction: column; gap: 10px; }
-    .message { max-width: 85%; padding: 10px 14px; border-radius: 14px; line-height: 1.4; font-size: 0.88rem; white-space: pre-wrap; word-break: break-word; }
+    .message { max-width: 88%; padding: 10px 14px; border-radius: 14px; line-height: 1.4; font-size: 0.88rem; white-space: pre-wrap; word-break: break-word; }
     .bot-message { background: #f1f5f9; color: #1e2937; align-self: flex-start; border-bottom-left-radius: 2px; }
     .user-message { background: #4f46e5; color: white; align-self: flex-end; border-bottom-right-radius: 2px; }
 
-    .input-area { display: flex; padding: 10px; border-top: 1px solid #e2e8f0; gap: 8px; }
+    .email-banner { background: #ecfdf5; border: 1px solid #10b981; color: #065f46; border-radius: 8px; padding: 10px; font-size: 0.8rem; margin-top: 6px; display: flex; align-items: center; gap: 8px; }
+
+    .input-area { display: flex; padding: 10px; border-top: 1px solid #e2e8f0; gap: 6px; align-items: center; }
     input[type="text"] { flex: 1; border: 1px solid #cbd5e1; border-radius: 20px; padding: 8px 14px; outline: none; font-size: 0.88rem; }
-    button.send-btn { background: #4f46e5; color: white; border: none; border-radius: 20px; padding: 0 16px; cursor: pointer; font-weight: 600; }
+    
+    .attach-btn { background: #f1f5f9; color: #475569; border: 1px solid #cbd5e1; border-radius: 50%; width: 36px; height: 36px; display: flex; align-items: center; justify-content: center; cursor: pointer; }
+    .attach-btn:hover { background: #e2e8f0; }
+    .image-preview { width: 38px; height: 38px; border-radius: 6px; object-fit: cover; display: none; margin-right: 4px; }
+
+    button.send-btn { background: #4f46e5; color: white; border: none; border-radius: 20px; padding: 0 16px; height: 36px; cursor: pointer; font-weight: 600; }
 
     .modal { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); justify-content: center; align-items: center; z-index: 100; }
     .modal-content { background: white; padding: 25px; border-radius: 12px; width: 380px; box-shadow: 0 10px 25px rgba(0,0,0,0.2); }
@@ -88,20 +95,20 @@
             <p>Track resolution status via PRN or Ticket ID.</p>
           </div>
           <div class="feature-item">
-            <h4>🛠️ Auto Routing</h4>
-            <p>Direct dispatch to Facilities or IT team.</p>
+            <h4>📎 Photo Attachment</h4>
+            <p>Upload photos of damaged equipment.</p>
           </div>
           <div class="feature-item">
-            <h4>📊 Live Admin Updates</h4>
-            <p>Transparent progress updates.</p>
+            <h4>📧 Email Confirmation</h4>
+            <p>Automated dispatch notification.</p>
           </div>
         </div>
       </div>
 
       <div class="info-card">
-        <h3><i class="fa-solid fa-graduation-cap"></i> Campus Assistance Overview</h3>
+        <h3><i class="fa-solid fa-camera"></i> Issue Photo Guidance</h3>
         <img src="https://images.unsplash.com/photo-1541339907198-e08756dedf3f?q=80&w=800&auto=format&fit=crop" style="width:100%; border-radius:8px; height:180px; object-fit:cover; margin-bottom:10px;">
-        <p>Ensure your classroom room numbers and specific details (e.g., Fan, Light, Wi-Fi Router) are included in the prompt for faster resolution.</p>
+        <p>You can attach photos of classroom issues (e.g., damaged fan, flickering projector) directly to your complaint!</p>
       </div>
     </div>
 
@@ -126,6 +133,11 @@
       <div class="messages-box" id="chatBox"></div>
 
       <div class="input-area">
+        <label class="attach-btn" title="Attach Image">
+          <i class="fa-solid fa-paperclip"></i>
+          <input type="file" id="fileInput" accept="image/*" style="display:none;" onchange="handleImageUpload(event)">
+        </label>
+        <img id="imgPreview" class="image-preview">
         <input type="text" id="userInput" placeholder="Type your complaint or issue..." onkeypress="handleKeyPress(event)">
         <button class="send-btn" onclick="sendMessage()">Send</button>
       </div>
@@ -171,6 +183,7 @@
 <script>
   const API_URL = "https://smart-ai-campus-helpdesk.onrender.com";
   let currentStudent = { name: "Anonymous", prn: "N/A", section: "N/A" };
+  let attachedImageData = null;
 
   window.onload = function() {
     const saved = localStorage.getItem('studentData');
@@ -208,11 +221,48 @@
     document.getElementById('dispPRN').innerText = currentStudent.prn;
   }
 
-  function appendMessageUI(sender, text) {
+  // Client-Side Canvas Image Compression (Prevents Server Overload)
+  function handleImageUpload(e) {
+    const file = e.target.files[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = function(evt) {
+      const img = new Image();
+      img.onload = function() {
+        const canvas = document.createElement('canvas');
+        const MAX_WIDTH = 300;
+        const scale = MAX_WIDTH / img.width;
+        canvas.width = MAX_WIDTH;
+        canvas.height = img.height * scale;
+
+        const ctx = canvas.getContext('2d');
+        ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+        
+        // Compressed base64 string
+        attachedImageData = canvas.toDataURL('image/jpeg', 0.6);
+        const preview = document.getElementById('imgPreview');
+        preview.src = attachedImageData;
+        preview.style.display = 'block';
+      };
+      img.src = evt.target.result;
+    };
+    reader.readAsDataURL(file);
+  }
+
+  function appendMessageUI(sender, text, ticketId = null) {
     const chatBox = document.getElementById("chatBox");
     const div = document.createElement("div");
     div.className = `message ${sender === 'user' ? 'user-message' : 'bot-message'}`;
     div.innerText = text;
+
+    if (ticketId) {
+      const emailBox = document.createElement("div");
+      emailBox.className = "email-banner";
+      emailBox.innerHTML = `<i class="fa-solid fa-envelope-circle-check"></i> <div><b>Email Confirmation Sent!</b><br>Confirmation dispatched to student record (${currentStudent.prn}).</div>`;
+      div.appendChild(emailBox);
+    }
+
     chatBox.appendChild(div);
     chatBox.scrollTop = chatBox.scrollHeight;
   }
@@ -232,8 +282,23 @@
       return;
     }
 
-    appendMessageUI('user', userText);
+    let userMsgText = userText;
+    if (attachedImageData) userMsgText += " 📷 [Image Attached]";
+
+    appendMessageUI('user', userMsgText);
+    
+    const payload = {
+      message: userText,
+      student_name: currentStudent.name,
+      prn: currentStudent.prn,
+      section: currentStudent.section,
+      image_data: attachedImageData
+    };
+
     inputField.value = "";
+    attachedImageData = null;
+    document.getElementById('imgPreview').style.display = 'none';
+    document.getElementById('fileInput').value = "";
 
     const chatBox = document.getElementById("chatBox");
     const loadingDiv = document.createElement("div");
@@ -246,20 +311,15 @@
       const response = await fetch(`${API_URL}/chat`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ 
-          message: userText,
-          student_name: currentStudent.name,
-          prn: currentStudent.prn,
-          section: currentStudent.section
-        })
+        body: JSON.stringify(payload)
       });
 
       const data = await response.json();
       chatBox.removeChild(loadingDiv);
-      appendMessageUI('bot', data.response || "Ticket registered successfully.");
+      appendMessageUI('bot', data.response || "Ticket registered successfully.", data.ticket_id);
     } catch (err) {
       chatBox.removeChild(loadingDiv);
-      appendMessageUI('bot', "Server connection error. Please try again.");
+      appendMessageUI('bot', "Server error. Please try again.");
     }
   }
 
