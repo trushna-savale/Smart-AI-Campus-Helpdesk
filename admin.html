@@ -57,47 +57,66 @@
 
 <script>
   const API_URL = "https://smart-ai-campus-helpdesk.onrender.com";
+  const ADMIN_PASSWORD = "admin123"; // 🔑 Your Admin Password
 
   window.onload = function() {
+    // Check password before loading admin data
+    const inputPass = prompt("🔐 Admin Access Required:\nPlease enter the Admin Password:");
+    
+    if (inputPass !== ADMIN_PASSWORD) {
+      alert("❌ Access Denied! Incorrect Password.");
+      window.location.href = "index.html"; // Send unauthorized users back to homepage
+      return;
+    }
+
+    // Password correct! Load dashboard data
     fetchAnalytics();
     fetchLogs();
   };
 
   async function fetchAnalytics() {
-    const res = await fetch(`${API_URL}/admin/analytics`);
-    const data = await res.json();
-    document.getElementById("metricTotal").innerText = data.total_tickets;
-    document.getElementById("metricOpen").innerText = data.open_tickets;
-    document.getElementById("metricResolved").innerText = data.resolved_tickets;
-    document.getElementById("metricCategory").innerText = data.top_category;
+    try {
+      const res = await fetch(`${API_URL}/admin/analytics`);
+      const data = await res.json();
+      document.getElementById("metricTotal").innerText = data.total_tickets;
+      document.getElementById("metricOpen").innerText = data.open_tickets;
+      document.getElementById("metricResolved").innerText = data.resolved_tickets;
+      document.getElementById("metricCategory").innerText = data.top_category;
+    } catch (err) {
+      console.error("Error fetching analytics:", err);
+    }
   }
 
   async function fetchLogs() {
-    const res = await fetch(`${API_URL}/admin/logs`);
-    const result = await res.json();
-    const tbody = document.getElementById("tableBody");
-    tbody.innerHTML = "";
+    try {
+      const res = await fetch(`${API_URL}/admin/logs`);
+      const result = await res.json();
+      const tbody = document.getElementById("tableBody");
+      tbody.innerHTML = "";
 
-    result.data.forEach(ticket => {
-      const row = document.createElement("tr");
-      row.innerHTML = `
-        <td><b>${ticket.ticket_id || '-'}</b></td>
-        <td>${ticket.student_name || 'Anonymous'}</td>
-        <td>${ticket.prn || 'N/A'}</td>
-        <td>${ticket.section || 'N/A'}</td>
-        <td>${ticket.category}</td>
-        <td>${ticket.user_message}</td>
-        <td><b>${ticket.status}</b></td>
-        <td>
-          <select onchange="updateStatus('${ticket.ticket_id}', this.value)">
-            <option value="Open" ${ticket.status === 'Open' ? 'selected' : ''}>Open</option>
-            <option value="In Progress" ${ticket.status === 'In Progress' ? 'selected' : ''}>In Progress</option>
-            <option value="Resolved" ${ticket.status === 'Resolved' ? 'selected' : ''}>Resolved</option>
-          </select>
-        </td>
-      `;
-      tbody.appendChild(row);
-    });
+      result.data.forEach(ticket => {
+        const row = document.createElement("tr");
+        row.innerHTML = `
+          <td><b>${ticket.ticket_id || '-'}</b></td>
+          <td>${ticket.student_name || 'Anonymous'}</td>
+          <td>${ticket.prn || 'N/A'}</td>
+          <td>${ticket.section || 'N/A'}</td>
+          <td>${ticket.category}</td>
+          <td>${ticket.user_message}</td>
+          <td><b>${ticket.status}</b></td>
+          <td>
+            <select onchange="updateStatus('${ticket.ticket_id}', this.value)">
+              <option value="Open" ${ticket.status === 'Open' ? 'selected' : ''}>Open</option>
+              <option value="In Progress" ${ticket.status === 'In Progress' ? 'selected' : ''}>In Progress</option>
+              <option value="Resolved" ${ticket.status === 'Resolved' ? 'selected' : ''}>Resolved</option>
+            </select>
+          </td>
+        `;
+        tbody.appendChild(row);
+      });
+    } catch (err) {
+      console.error("Error fetching logs:", err);
+    }
   }
 
   async function updateStatus(ticketId, newStatus) {
