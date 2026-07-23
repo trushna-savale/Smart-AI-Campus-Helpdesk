@@ -1,13 +1,14 @@
 import os
+import sqlite3
+from datetime import datetime
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from groq import Groq
 
-# Initialize the FastAPI app variable
 app = FastAPI(title="Smart AI Campus Helpdesk API")
 
-# Add CORS middleware for frontend access
+# Allow CORS for public access
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -16,7 +17,46 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Multi-line string properly enclosed with triple quotes
+# ---------------------------------------------------------
+# DATABASE SETUP
+# ---------------------------------------------------------
+DB_FILE = "helpdesk.db"
+
+def init_db():
+    """Create the logs table if it doesn't exist."""
+    conn = sqlite3.connect(DB_FILE)
+    cursor = conn.cursor()
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS chat_logs (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            timestamp TEXT NOT NULL,
+            user_message TEXT NOT NULL,
+            bot_response TEXT NOT NULL
+        )
+    """)
+    conn.commit()
+    conn.close()
+
+# Initialize DB when app starts
+init_db()
+
+def log_to_db(user_message: str, bot_response: str):
+    """Save a user query and bot response to SQLite."""
+    try:
+        conn = sqlite3.connect(DB_FILE)
+        cursor = conn.cursor()
+        cursor.execute(
+            "INSERT INTO chat_logs (timestamp, user_message, bot_response) VALUES (?, ?, ?)",
+            (datetime.utcnow().strftime("%Y-%m-%d %H:%M:%S"), user_message, bot_response)
+        )
+        conn.commit()
+        conn.close()
+    except Exception as e:
+        print(f"Database logging error: {e}")
+
+# ---------------------------------------------------------
+# PROMPT & ROUTING
+# ---------------------------------------------------------
 SYSTEM_INSTRUCTION = """
 You are an AI Smart Campus Helpdesk Assistant.
 Your job is to help students register campus complaints professionally.
@@ -93,7 +133,6 @@ Smart Campus Helpdesk Team
 
 --------------------------------------------------
 
-Always keep responses polite, concise, and structured.
 """
 
 class QueryRequest(BaseModel):
@@ -119,6 +158,31 @@ def chat(request: QueryRequest):
             ],
             model="llama-3.3-70b-versatile",
         )
-        return {"response": chat_completion.choices[0].message.content}
+        
+        bot_reply = chat_completion.choices[0].message.content
+        
+        # Save interaction to central database
+        log_to_db(request.message, bot_reply)
+        
+        return {"response": bot_reply}
+    except Exception as e:
+        return {"error": str(e)}
+
+# ---------------------------------------------------------
+# ADMIN ENDPOINT: VIEW ALL USER DATA
+# ---------------------------------------------------------
+@app.get("/admin/logs")
+def get_all_logs():
+    """Admin-only endpoint to view all logged interactions."""
+    try:
+        conn = sqlite3.connect(DB_FILE)
+        conn.row_factory = sqlite3.Row
+        cursor = conn.cursor()
+        cursor.execute("SELECT * FROM chat_logs ORDER BY id DESC")
+        rows = cursor.fetchall()
+        conn.close()
+        
+        logs = [dict(row) for row in rows]
+        return {"total_logs": len(logs), "data": logs}
     except Exception as e:
         return {"error": str(e)}
