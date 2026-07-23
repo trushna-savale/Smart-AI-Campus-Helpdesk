@@ -1,14 +1,16 @@
 import os
+import re
+import csv
+import io
 import sqlite3
 from datetime import datetime
-from fastapi import FastAPI
+from fastapi import FastAPI, Response
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from groq import Groq
 
 app = FastAPI(title="Smart AI Campus Helpdesk API")
 
-# Allow CORS for public access
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -17,46 +19,59 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# ---------------------------------------------------------
-# DATABASE SETUP
-# ---------------------------------------------------------
 DB_FILE = "helpdesk.db"
 
 def init_db():
-    """Create the logs table if it doesn't exist."""
     conn = sqlite3.connect(DB_FILE)
     cursor = conn.cursor()
     cursor.execute("""
         CREATE TABLE IF NOT EXISTS chat_logs (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
+            ticket_id TEXT UNIQUE,
             timestamp TEXT NOT NULL,
             user_message TEXT NOT NULL,
-            bot_response TEXT NOT NULL
+            bot_response TEXT NOT NULL,
+            status TEXT DEFAULT 'Open',
+            category TEXT DEFAULT 'General'
         )
     """)
     conn.commit()
     conn.close()
 
-# Initialize DB when app starts
 init_db()
 
+def extract_ticket_info(bot_response: str):
+    """Parses ticket ID and category from AI output using Regex."""
+    ticket_match = re.search(r'CMP-\d+', bot_response)
+    ticket_id = ticket_match.group(0) if ticket_match else f"CMP-{int(datetime.utcnow().timestamp()) % 1000000:06d}"
+    
+    category = "General"
+    if "Electrical" in bot_response or "fan" in bot_response.lower():
+        category = "Electrical"
+    elif "IT" in bot_response or "wifi" in bot_response.lower():
+        category = "IT Support"
+    elif "Maintenance" in bot_response:
+        category = "Maintenance"
+        
+    return ticket_id, category
+
 def log_to_db(user_message: str, bot_response: str):
-    """Save a user query and bot response to SQLite."""
     try:
+        ticket_id, category = extract_ticket_info(bot_response)
         conn = sqlite3.connect(DB_FILE)
         cursor = conn.cursor()
         cursor.execute(
-            "INSERT INTO chat_logs (timestamp, user_message, bot_response) VALUES (?, ?, ?)",
-            (datetime.utcnow().strftime("%Y-%m-%d %H:%M:%S"), user_message, bot_response)
+            "INSERT INTO chat_logs (ticket_id, timestamp, user_message, bot_response, status, category) VALUES (?, ?, ?, ?, ?, ?)",
+            (ticket_id, datetime.utcnow().strftime("%Y-%m-%d %H:%M:%S"), user_message, bot_response, 'Open', category)
         )
         conn.commit()
         conn.close()
+        return ticket_id
     except Exception as e:
         print(f"Database logging error: {e}")
+        return None
 
-# ---------------------------------------------------------
-# PROMPT & ROUTING
-# ---------------------------------------------------------
+# Paste your full Langflow system prompt here!
 SYSTEM_INSTRUCTION = """
 You are an AI Smart Campus Helpdesk Assistant.
 Your job is to help students register campus complaints professionally.
@@ -133,10 +148,16 @@ Smart Campus Helpdesk Team
 
 --------------------------------------------------
 
+
+Provide clear, structured, and helpful responses.
 """
 
 class QueryRequest(BaseModel):
     message: str
+
+class StatusUpdateRequest(BaseModel):
+    ticket_id: str
+    status: str
 
 @app.get("/")
 def home():
@@ -160,29 +181,86 @@ def chat(request: QueryRequest):
         )
         
         bot_reply = chat_completion.choices[0].message.content
+        ticket_id = log_to_db(request.message, bot_reply)
         
-        # Save interaction to central database
-        log_to_db(request.message, bot_reply)
-        
-        return {"response": bot_reply}
+        return {"response": bot_reply, "ticket_id": ticket_id}
     except Exception as e:
         return {"error": str(e)}
 
-# ---------------------------------------------------------
-# ADMIN ENDPOINT: VIEW ALL USER DATA
-# ---------------------------------------------------------
+# FEATURE 2: TICKET SEARCH ENDPOINT
+@app.get("/ticket/{ticket_id}")
+def get_ticket(ticket_id: str):
+    conn = sqlite3.connect(DB_FILE)
+    conn.row_factory = sqlite3.Row
+    cursor = conn.cursor()
+    cursor.execute("SELECT * FROM chat_logs WHERE ticket_id = ?", (ticket_id,))
+    row = cursor.fetchone()
+    conn.close()
+    if row:
+        return dict(row)
+    return {"error": "Ticket not found"}
+
+# FEATURE 3: ADMIN LOGS & UPDATE ENDPOINTS
 @app.get("/admin/logs")
 def get_all_logs():
-    """Admin-only endpoint to view all logged interactions."""
-    try:
-        conn = sqlite3.connect(DB_FILE)
-        conn.row_factory = sqlite3.Row
-        cursor = conn.cursor()
-        cursor.execute("SELECT * FROM chat_logs ORDER BY id DESC")
-        rows = cursor.fetchall()
-        conn.close()
-        
-        logs = [dict(row) for row in rows]
-        return {"total_logs": len(logs), "data": logs}
-    except Exception as e:
-        return {"error": str(e)}
+    conn = sqlite3.connect(DB_FILE)
+    conn.row_factory = sqlite3.Row
+    cursor = conn.cursor()
+    cursor.execute("SELECT * FROM chat_logs ORDER BY id DESC")
+    rows = cursor.fetchall()
+    conn.close()
+    return {"total_logs": len(rows), "data": [dict(row) for row in rows]}
+
+@app.post("/admin/update-status")
+def update_status(req: StatusUpdateRequest):
+    conn = sqlite3.connect(DB_FILE)
+    cursor = conn.cursor()
+    cursor.execute("UPDATE chat_logs SET status = ? WHERE ticket_id = ?", (req.status, req.ticket_id))
+    conn.commit()
+    conn.close()
+    return {"status": "success", "ticket_id": req.ticket_id, "new_status": req.status}
+
+# FEATURE 4: EXPORT TO CSV
+@app.get("/admin/export-csv")
+def export_csv():
+    conn = sqlite3.connect(DB_FILE)
+    cursor = conn.cursor()
+    cursor.execute("SELECT ticket_id, timestamp, category, status, user_message FROM chat_logs")
+    rows = cursor.fetchall()
+    conn.close()
+
+    output = io.StringIO()
+    writer = csv.writer(output)
+    writer.writerow(["Ticket ID", "Timestamp", "Category", "Status", "User Message"])
+    writer.writerows(rows)
+
+    response = Response(content=output.getvalue(), media_type="text/csv")
+    response.headers["Content-Disposition"] = "attachment; filename=campus_tickets.csv"
+    return response
+
+# FEATURE 5: ANALYTICS METRICS
+@app.get("/admin/analytics")
+def get_analytics():
+    conn = sqlite3.connect(DB_FILE)
+    cursor = conn.cursor()
+    
+    cursor.execute("SELECT COUNT(*) FROM chat_logs")
+    total = cursor.fetchone()[0]
+    
+    cursor.execute("SELECT COUNT(*) FROM chat_logs WHERE status = 'Open'")
+    open_tickets = cursor.fetchone()[0]
+    
+    cursor.execute("SELECT COUNT(*) FROM chat_logs WHERE status = 'Resolved'")
+    resolved_tickets = cursor.fetchone()[0]
+    
+    cursor.execute("SELECT category, COUNT(*) FROM chat_logs GROUP BY category ORDER BY COUNT(*) DESC LIMIT 1")
+    top_cat = cursor.fetchone()
+    top_category = top_cat[0] if top_cat else "None"
+    
+    conn.close()
+    return {
+        "total_tickets": total,
+        "open_tickets": open_tickets,
+        "resolved_tickets": resolved_tickets,
+        "top_category": top_category
+    }
