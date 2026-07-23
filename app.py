@@ -23,28 +23,24 @@ app.add_middleware(
 DB_FILE = "helpdesk.db"
 
 def init_db():
-    try:
-        conn = sqlite3.connect(DB_FILE)
-        cursor = conn.cursor()
-        cursor.execute("""
-            CREATE TABLE IF NOT EXISTS chat_logs (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                ticket_id TEXT,
-                timestamp TEXT NOT NULL,
-                student_name TEXT DEFAULT 'Anonymous',
-                prn TEXT DEFAULT 'N/A',
-                section TEXT DEFAULT 'N/A',
-                user_message TEXT NOT NULL,
-                bot_response TEXT NOT NULL,
-                status TEXT DEFAULT 'Open',
-                category TEXT DEFAULT 'General',
-                image_data TEXT DEFAULT NULL
-            )
-        """)
-        conn.commit()
-        conn.close()
-    except Exception as e:
-        print(f"DB Init Warning: {e}")
+    conn = sqlite3.connect(DB_FILE)
+    cursor = conn.cursor()
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS chat_logs (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            ticket_id TEXT,
+            timestamp TEXT NOT NULL,
+            student_name TEXT DEFAULT 'Anonymous',
+            prn TEXT DEFAULT 'N/A',
+            section TEXT DEFAULT 'N/A',
+            user_message TEXT NOT NULL,
+            bot_response TEXT NOT NULL,
+            status TEXT DEFAULT 'Open',
+            category TEXT DEFAULT 'General'
+        )
+    """)
+    conn.commit()
+    conn.close()
 
 init_db()
 
@@ -63,23 +59,24 @@ def extract_ticket_info(bot_response: str):
         
     return ticket_id, category
 
-def log_to_db(student_name: str, prn: str, section: str, user_message: str, bot_response: str, image_data: str = None):
+def log_to_db(student_name: str, prn: str, section: str, user_message: str, bot_response: str):
     try:
         ticket_id, category = extract_ticket_info(bot_response)
         conn = sqlite3.connect(DB_FILE)
         cursor = conn.cursor()
         cursor.execute(
             """INSERT INTO chat_logs 
-               (ticket_id, timestamp, student_name, prn, section, user_message, bot_response, status, category, image_data) 
-               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
-            (ticket_id, datetime.utcnow().strftime("%Y-%m-%d %H:%M:%S"), student_name, prn, section, user_message, bot_response, 'Open', category, image_data)
+               (ticket_id, timestamp, student_name, prn, section, user_message, bot_response, status, category) 
+               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+            (ticket_id, datetime.utcnow().strftime("%Y-%m-%d %H:%M:%S"), student_name, prn, section, user_message, bot_response, 'Open', category)
         )
         conn.commit()
         conn.close()
         return ticket_id
     except Exception as e:
-        print(f"DB Logging Error (Bypassed): {e}")
-        return f"CMP-{random.randint(100000, 999999)}"
+        print(f"Database bypass notice: {e}")
+        ticket_match = re.search(r'CMP-\d+', bot_response)
+        return ticket_match.group(0) if ticket_match else f"CMP-{random.randint(100000, 999999)}"
 
 SYSTEM_INSTRUCTION = """
 You are an AI Smart Campus Helpdesk Assistant.
@@ -158,7 +155,7 @@ Smart Campus Helpdesk Team
 --------------------------------------------------
 
 
-Be clear, professional, and reassuring.
+Be polite, helpful, and concise.
 """
 
 class QueryRequest(BaseModel):
@@ -166,7 +163,6 @@ class QueryRequest(BaseModel):
     student_name: str = "Anonymous"
     prn: str = "N/A"
     section: str = "N/A"
-    image_data: str = None
 
 class StatusUpdateRequest(BaseModel):
     ticket_id: str
@@ -181,114 +177,95 @@ def chat(request: QueryRequest):
     try:
         api_key = os.getenv("GROQ_API_KEY")
         if not api_key:
-            return {"response": "⚠️ Error: GROQ_API_KEY environment variable is missing on Render settings.", "ticket_id": None}
+            return {"response": "GROQ_API_KEY environment variable is missing on server.", "ticket_id": None}
             
         client = Groq(api_key=api_key)
         
-        prompt_content = f"Student Info: Name={request.student_name}, PRN={request.prn}, Section={request.section}. Issue: {request.message}"
-        if request.image_data:
-            prompt_content += " [Photo attached by student]."
-
         chat_completion = client.chat.completions.create(
             messages=[
                 {"role": "system", "content": SYSTEM_INSTRUCTION},
-                {"role": "user", "content": prompt_content}
+                {"role": "user", "content": f"Student Info: Name={request.student_name}, PRN={request.prn}, Section={request.section}. Message: {request.message}"}
             ],
             model="llama-3.3-70b-versatile",
         )
         
         bot_reply = chat_completion.choices[0].message.content
-        ticket_id = log_to_db(request.student_name, request.prn, request.section, request.message, bot_reply, request.image_data)
+        ticket_id = log_to_db(request.student_name, request.prn, request.section, request.message, bot_reply)
         
         return {"response": bot_reply, "ticket_id": ticket_id}
     except Exception as e:
-        return {"response": f"⚠️ Backend Exception: {str(e)}", "ticket_id": None}
+        return {"response": f"Error: {str(e)}", "ticket_id": None}
 
 @app.get("/ticket/{query}")
 def get_ticket(query: str):
-    try:
-        conn = sqlite3.connect(DB_FILE)
-        conn.row_factory = sqlite3.Row
-        cursor = conn.cursor()
-        cursor.execute("SELECT * FROM chat_logs WHERE ticket_id = ? OR prn = ? ORDER BY id DESC", (query, query))
-        rows = cursor.fetchall()
-        conn.close()
-        if rows:
-            return {"tickets": [dict(r) for r in rows]}
-        return {"error": "No records found for given Ticket ID or PRN"}
-    except Exception as e:
-        return {"error": str(e)}
+    conn = sqlite3.connect(DB_FILE)
+    conn.row_factory = sqlite3.Row
+    cursor = conn.cursor()
+    cursor.execute("SELECT * FROM chat_logs WHERE ticket_id = ? OR prn = ? ORDER BY id DESC", (query, query))
+    rows = cursor.fetchall()
+    conn.close()
+    if rows:
+        return {"tickets": [dict(r) for r in rows]}
+    return {"error": "No records found for given Ticket ID or PRN"}
 
 @app.get("/admin/logs")
 def get_all_logs():
-    try:
-        conn = sqlite3.connect(DB_FILE)
-        conn.row_factory = sqlite3.Row
-        cursor = conn.cursor()
-        cursor.execute("SELECT * FROM chat_logs ORDER BY id DESC")
-        rows = cursor.fetchall()
-        conn.close()
-        return {"total_logs": len(rows), "data": [dict(row) for row in rows]}
-    except Exception as e:
-        return {"total_logs": 0, "data": []}
+    conn = sqlite3.connect(DB_FILE)
+    conn.row_factory = sqlite3.Row
+    cursor = conn.cursor()
+    cursor.execute("SELECT * FROM chat_logs ORDER BY id DESC")
+    rows = cursor.fetchall()
+    conn.close()
+    return {"total_logs": len(rows), "data": [dict(row) for row in rows]}
 
 @app.post("/admin/update-status")
 def update_status(req: StatusUpdateRequest):
-    try:
-        conn = sqlite3.connect(DB_FILE)
-        cursor = conn.cursor()
-        cursor.execute("UPDATE chat_logs SET status = ? WHERE ticket_id = ?", (req.status, req.ticket_id))
-        conn.commit()
-        conn.close()
-        return {"status": "success", "ticket_id": req.ticket_id, "new_status": req.status}
-    except Exception as e:
-        return {"status": "error", "message": str(e)}
+    conn = sqlite3.connect(DB_FILE)
+    cursor = conn.cursor()
+    cursor.execute("UPDATE chat_logs SET status = ? WHERE ticket_id = ?", (req.status, req.ticket_id))
+    conn.commit()
+    conn.close()
+    return {"status": "success", "ticket_id": req.ticket_id, "new_status": req.status}
 
 @app.get("/admin/export-csv")
 def export_csv():
-    try:
-        conn = sqlite3.connect(DB_FILE)
-        cursor = conn.cursor()
-        cursor.execute("SELECT ticket_id, timestamp, student_name, prn, section, category, status, user_message FROM chat_logs")
-        rows = cursor.fetchall()
-        conn.close()
+    conn = sqlite3.connect(DB_FILE)
+    cursor = conn.cursor()
+    cursor.execute("SELECT ticket_id, timestamp, student_name, prn, section, category, status, user_message FROM chat_logs")
+    rows = cursor.fetchall()
+    conn.close()
 
-        output = io.StringIO()
-        writer = csv.writer(output)
-        writer.writerow(["Ticket ID", "Timestamp", "Name", "PRN", "Section", "Category", "Status", "User Message"])
-        writer.writerows(rows)
+    output = io.StringIO()
+    writer = csv.writer(output)
+    writer.writerow(["Ticket ID", "Timestamp", "Name", "PRN", "Section", "Category", "Status", "User Message"])
+    writer.writerows(rows)
 
-        response = Response(content=output.getvalue(), media_type="text/csv")
-        response.headers["Content-Disposition"] = "attachment; filename=campus_tickets.csv"
-        return response
-    except Exception as e:
-        return Response(content="Error exporting CSV", media_type="text/plain")
+    response = Response(content=output.getvalue(), media_type="text/csv")
+    response.headers["Content-Disposition"] = "attachment; filename=campus_tickets.csv"
+    return response
 
 @app.get("/admin/analytics")
 def get_analytics():
-    try:
-        conn = sqlite3.connect(DB_FILE)
-        cursor = conn.cursor()
-        
-        cursor.execute("SELECT COUNT(*) FROM chat_logs")
-        total = cursor.fetchone()[0]
-        
-        cursor.execute("SELECT COUNT(*) FROM chat_logs WHERE status = 'Open'")
-        open_tickets = cursor.fetchone()[0]
-        
-        cursor.execute("SELECT COUNT(*) FROM chat_logs WHERE status = 'Resolved'")
-        resolved_tickets = cursor.fetchone()[0]
-        
-        cursor.execute("SELECT category, COUNT(*) FROM chat_logs GROUP BY category ORDER BY COUNT(*) DESC LIMIT 1")
-        top_cat = cursor.fetchone()
-        top_category = top_cat[0] if top_cat else "None"
-        
-        conn.close()
-        return {
-            "total_tickets": total,
-            "open_tickets": open_tickets,
-            "resolved_tickets": resolved_tickets,
-            "top_category": top_category
-        }
-    except Exception as e:
-        return {"total_tickets": 0, "open_tickets": 0, "resolved_tickets": 0, "top_category": "None"}
+    conn = sqlite3.connect(DB_FILE)
+    cursor = conn.cursor()
+    
+    cursor.execute("SELECT COUNT(*) FROM chat_logs")
+    total = cursor.fetchone()[0]
+    
+    cursor.execute("SELECT COUNT(*) FROM chat_logs WHERE status = 'Open'")
+    open_tickets = cursor.fetchone()[0]
+    
+    cursor.execute("SELECT COUNT(*) FROM chat_logs WHERE status = 'Resolved'")
+    resolved_tickets = cursor.fetchone()[0]
+    
+    cursor.execute("SELECT category, COUNT(*) FROM chat_logs GROUP BY category ORDER BY COUNT(*) DESC LIMIT 1")
+    top_cat = cursor.fetchone()
+    top_category = top_cat[0] if top_cat else "None"
+    
+    conn.close()
+    return {
+        "total_tickets": total,
+        "open_tickets": open_tickets,
+        "resolved_tickets": resolved_tickets,
+        "top_category": top_category
+    }
