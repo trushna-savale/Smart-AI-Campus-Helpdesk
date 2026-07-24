@@ -149,30 +149,6 @@ AI Recommendations:
 3.
 
 
-Email Draft:
-
-
-Subject: Complaint Registered Successfully
-
-
-Dear Student,
-
-
-Your complaint has been successfully registered.
-
-
-Ticket ID:
-
-
-Assigned Department:
-
-
-Priority:
-
-
-Estimated Resolution Time:
-
-
 Our support team will resolve the issue as soon as possible.
 
 

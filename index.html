@@ -44,8 +44,6 @@
     .bot-message { background: #f1f5f9; color: #1e2937; align-self: flex-start; border-bottom-left-radius: 2px; }
     .user-message { background: #4f46e5; color: white; align-self: flex-end; border-bottom-right-radius: 2px; }
 
-    .email-banner { background: #ecfdf5; border: 1px solid #10b981; color: #065f46; border-radius: 8px; padding: 10px; font-size: 0.8rem; margin-top: 8px; display: flex; align-items: center; gap: 8px; }
-
     .input-area { display: flex; padding: 10px; border-top: 1px solid #e2e8f0; gap: 8px; align-items: center; }
     input[type="text"] { flex: 1; border: 1px solid #cbd5e1; border-radius: 20px; padding: 8px 14px; outline: none; font-size: 0.88rem; }
     button.send-btn { background: #4f46e5; color: white; border: none; border-radius: 20px; padding: 0 16px; height: 36px; cursor: pointer; font-weight: 600; }
@@ -94,15 +92,15 @@
             <p>Direct dispatch to Facilities or IT team.</p>
           </div>
           <div class="feature-item">
-            <h4>📧 Email Notification</h4>
-            <p>Automated confirmation banner.</p>
+            <h4>📊 Central Database</h4>
+            <p>Real-time updates for campus admins.</p>
           </div>
         </div>
       </div>
 
       <div class="info-card">
         <h3><i class="fa-solid fa-graduation-cap"></i> Campus Assistance Overview</h3>
-        <img src="https://images.unsplash.com/photo-1541339907198-e08756dedf3f?q=80&w=800&auto=format&fit=crop" style="width:100%; border-radius:8px; height:180px; object-fit:cover; margin-bottom:10px;">
+        <img src="https://images.unsplash.com/photo-1541339907198-e08756dedf3f?q=80&w=800&auto=format&fit=crop" style="width:100%; border-radius:8px; height:180px; object-fit:cover; margin-bottom:10px;" alt="Campus Overview">
         <p>Ensure your classroom room numbers and specific details (e.g., Fan, Light, Wi-Fi Router) are included in the prompt for faster resolution.</p>
       </div>
     </div>
@@ -210,18 +208,11 @@
     document.getElementById('dispPRN').innerText = currentStudent.prn;
   }
 
-  function appendMessageUI(sender, text, ticketId = null) {
+  function appendMessageUI(sender, text) {
     const chatBox = document.getElementById("chatBox");
     const div = document.createElement("div");
     div.className = `message ${sender === 'user' ? 'user-message' : 'bot-message'}`;
     div.innerText = text;
-
-    if (ticketId) {
-      const emailBox = document.createElement("div");
-      emailBox.className = "email-banner";
-      emailBox.innerHTML = `<i class="fa-solid fa-envelope-circle-check"></i> <div><b>Email Confirmation Sent!</b><br>Confirmation dispatched to student record (${currentStudent.prn}).</div>`;
-      div.appendChild(emailBox);
-    }
 
     chatBox.appendChild(div);
     chatBox.scrollTop = chatBox.scrollHeight;
@@ -268,7 +259,7 @@
       chatBox.removeChild(loadingDiv);
       
       const botReplyText = data.response || "SMART CAMPUS HELPDESK REPORT\nTicket ID: CMP-100000\nCategory: General\nStatus: Open\n\nYour complaint has been logged.";
-      appendMessageUI('bot', botReplyText, data.ticket_id);
+      appendMessageUI('bot', botReplyText);
     } catch (err) {
       chatBox.removeChild(loadingDiv);
       appendMessageUI('bot', "Server error. Please try again.");
