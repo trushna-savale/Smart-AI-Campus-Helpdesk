@@ -175,9 +175,9 @@
   let currentStudent = { name: "Anonymous", prn: "N/A", section: "N/A" };
 
   window.onload = function() {
-    const saved = localStorage.getItem('studentData');
-    if (saved) {
-      currentStudent = JSON.parse(saved);
+    const savedStudent = localStorage.getItem('studentData');
+    if (savedStudent) {
+      currentStudent = JSON.parse(savedStudent);
       updateStudentDisplay();
     } else {
       openRegisterModal();
@@ -302,43 +302,6 @@
 
   function handleKeyPress(e) { if (e.key === "Enter") sendMessage(); }
 </script>
-// 1. Load saved messages on page load
-window.onload = function() {
-  const savedStudent = localStorage.getItem('studentData');
-  if (savedStudent) {
-    currentStudent = JSON.parse(savedStudent);
-    updateStudentDisplay();
-  } else {
-    openRegisterModal();
-  }
 
-  const savedChat = localStorage.getItem('chatHistory');
-  if (savedChat) {
-    document.getElementById("chatBox").innerHTML = savedChat;
-  } else {
-    appendMessageUI('bot', 'Hello! Welcome to the Smart Campus Helpdesk. How can I assist you today?');
-  }
-};
-
-// 2. Update appendMessageUI to store chat HTML
-function appendMessageUI(sender, text, ticketId = null) {
-  const chatBox = document.getElementById("chatBox");
-  const div = document.createElement("div");
-  div.className = `message ${sender === 'user' ? 'user-message' : 'bot-message'}`;
-  div.innerText = text;
-
-  if (ticketId) {
-    const emailBox = document.createElement("div");
-    emailBox.className = "email-banner";
-    emailBox.innerHTML = `<i class="fa-solid fa-envelope-circle-check"></i> <div><b>Email Confirmation Sent!</b><br>Confirmation dispatched to student record (${currentStudent.prn}).</div>`;
-    div.appendChild(emailBox);
-  }
-
-  chatBox.appendChild(div);
-  chatBox.scrollTop = chatBox.scrollHeight;
-
-  // Save entire chat markup to LocalStorage
-  localStorage.setItem('chatHistory', chatBox.innerHTML);
-}
 </body>
 </html>
